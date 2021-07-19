@@ -87,25 +87,27 @@ func (srv *HTTPService) DeleteChain(c *gin.Context) {
 }
 
 func (srv *HTTPService) UpdateChain(c *gin.Context) {
-	var req AddChainRequest
-	if err := c.BindJSON(&req); err != nil {
-		onError(c, http.StatusBadRequest, "invalid JSON payload")
+	var bodyBytes []byte
+	// 从原有Request.Body读取
+	bodyBytes, err := ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		logging.Logger.Errorf(err.Error())
+		c.JSON(http.StatusBadRequest, "invalid JSON payload")
 		return
 	}
-
 	chainID := c.Param("chainid")
 	if err := ValidateChainID(chainID); err != nil {
 		onError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	err := srv.ChainManager.DeleteChain(chainID)
+	err = srv.ChainManager.DeleteChain(chainID)
 	if err != nil {
 		onError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	chainID, err = srv.ChainManager.AddChain([]byte(req.ChainParams))
+	chainID, err = srv.ChainManager.AddChain(bodyBytes)
 	if err != nil {
 		onError(c, http.StatusInternalServerError, err.Error())
 		return
