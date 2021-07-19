@@ -312,7 +312,7 @@ func (opb *OpbChain) getBlockNumber() (int64, error) {
 func (opb *OpbChain) parseCrossChainRequest(txResults []*abci.ResponseDeliverTx, block *ctypes.ResultBlock) {
 	for i, txResult := range txResults {
 		for _, e := range txResult.Events {
-			if e.Type == "wasm"{
+			if e.Type == "wasm" && len(e.Attributes) > 1 {
 				contractAddr, _ := opb.getAttributeValue(e, "contract_address")
 				if contractAddr == opb.Config.ChainParams.IServiceCoreAddr{
 					request := opb.buildInterchainRequest(e)
