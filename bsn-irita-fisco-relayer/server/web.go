@@ -61,7 +61,7 @@ func (srv *HTTPService) AddChain(c *gin.Context) {
 		return
 	}
 
-	chainID, err := srv.ChainManager.AddChain([]byte(bodyBytes))
+	chainID, err := srv.ChainManager.AddChain(bodyBytes)
 	if err != nil {
 		onError(c, http.StatusInternalServerError, err.Error())
 		return

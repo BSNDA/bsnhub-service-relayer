@@ -1,6 +1,7 @@
 base:
     app_chain_type: fisco # application chain type
     store_path: .db # store path
+    http_port: 8082
 
 # irita-hub config
 hub:
@@ -22,7 +23,7 @@ fisco:
     sm_crypto: true
     priv_key_file: /Users/bianjie/BSN/bsnhub-service-relayer/bsn-irita-fisco-relayer/keys/key.pem
     nodes:
-        fisco1.bsnbase.com: 192.168.1.72:20200
+        fisco1.bsnbase.com: 60.247.61.162:20200
         fisco2.bsnbase.com: 192.168.1.72:20201
 
 # mysql config
