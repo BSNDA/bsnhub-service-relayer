@@ -278,13 +278,13 @@ func (opb *OpbChain) scanBlocks(startHeight int64, endHeight int64) {
 		blockResult, err := opb.OpbClient.BlockResults(context.Background(), &h)
 		if err != nil {
 			logging.Logger.Errorf(err.Error())
-			time.Sleep(time.Duration(5) * time.Second)
+			time.Sleep(time.Duration(10) * time.Second)
 			continue
 		}
 		block, err := opb.OpbClient.Block(context.Background(), &h)
 		if err != nil {
 			logging.Logger.Errorf(err.Error())
-			time.Sleep(time.Duration(5) * time.Second)
+			time.Sleep(time.Duration(10) * time.Second)
 			continue
 		}
 		opb.parseCrossChainRequest(blockResult.TxsResults, block)

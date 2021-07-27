@@ -1,6 +1,7 @@
 base:
     app_chain_type: opb # application chain type
     store_path: .db # store path
+    http_port: 8082
 
 # irita-hub config
 hub:
