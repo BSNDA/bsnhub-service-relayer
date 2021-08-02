@@ -3,6 +3,7 @@ package fabric
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	eventfab "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
 	"relayer/appchains/fabric/config"
@@ -197,6 +198,8 @@ func (fc *FabricChain) blockevent(event *eventfab.BlockEvent) {
 							logging.Logger.Errorf("failed to decode endpointInfo: %s", err)
 						}
 						if err == nil && request != nil && request.Response == nil {
+							logging.Logger.Infof("CallData is %s ", request.Request.CallData)
+							callDataBytes := convCallData(request.Request.CallData)
 							event := core.InterchainRequest{
 								ID:              request.Request.RequestId,
 								SourceChainID:   fc.GetChainID(),
@@ -206,7 +209,7 @@ func (fc *FabricChain) blockevent(event *eventfab.BlockEvent) {
 								EndpointAddress: endpointInfo.EndpointAddress,
 								EndpointType:    endpointInfo.DestChainType,
 								Method:          request.Request.Method,
-								CallData:        []byte(request.Request.CallData),
+								CallData:        callDataBytes,
 								TxHash:          trans.TxId,
 								Sender:          trans.CreateName,
 							}
@@ -241,6 +244,15 @@ func (fc *FabricChain) blockevent(event *eventfab.BlockEvent) {
 		//	}
 		//}
 
+	}
+
+}
+func convCallData(data string) []byte {
+	bytes, err := hexutil.Decode(data)
+	if err != nil {
+		return []byte(data)
+	} else {
+		return bytes
 	}
 
 }

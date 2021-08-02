@@ -17,7 +17,6 @@ import (
 	"relayer/logging"
 )
 
-
 type ServiceInfo struct {
 	ServiceName string
 	Schemas     string
@@ -69,7 +68,6 @@ func NewIritaHubChain(
 		keyPath = defaultKeyPath
 	}
 
-
 	if len(serviceName) == 0 {
 		serviceName = defaultServiceName
 	}
@@ -108,12 +106,12 @@ func NewIritaHubChain(
 	}
 
 	hub := IritaHubChain{
-		ChainID:       chainID,
-		NodeRPCAddr:   nodeRPCAddr,
-		KeyPath:       keyPath,
-		KeyName:       keyName,
-		Passphrase:    passphrase,
-		ServiceInfo:   ServiceInfo{
+		ChainID:     chainID,
+		NodeRPCAddr: nodeRPCAddr,
+		KeyPath:     keyPath,
+		KeyName:     keyName,
+		Passphrase:  passphrase,
+		ServiceInfo: ServiceInfo{
 			ServiceName: serviceName,
 			Schemas:     schemas,
 			Provider:    provider,
@@ -165,6 +163,8 @@ func (ic IritaHubChain) SendInterchainRequest(
 	if err != nil {
 		return err
 	}
+
+	logging.Logger.Infof("BuildServiceInvocationRequest is %v", invokeServiceReq)
 
 	reqCtxID, resTx, err := ic.ServiceClient.InvokeService(invokeServiceReq, ic.BuildBaseTx())
 	if err != nil {
@@ -228,8 +228,8 @@ func (ic IritaHubChain) BuildServiceInvocationRequest(
 				EndpointType:    request.EndpointType,
 				EndpointAddress: request.EndpointAddress,
 			},
-			Method: request.Method,
-			CallData:   request.CallData,
+			Method:   request.Method,
+			CallData: request.CallData,
 		},
 	}
 

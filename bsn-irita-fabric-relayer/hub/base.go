@@ -12,10 +12,10 @@ type Header struct {
 }
 
 type Body struct {
-	Source `json:"source"`
-	Dest   `json:"dest"`
-	Method string `json:"method"`
-	CallData   []byte `json:"args"`
+	Source   `json:"source"`
+	Dest     `json:"dest"`
+	Method   string `json:"method"`
+	CallData []byte `json:"calldata"`
 }
 
 type Source struct {
@@ -35,4 +35,3 @@ type Dest struct {
 	EndpointType    string `json:"endpoint_type"`
 	EndpointAddress string `json:"endpoint_address"`
 }
-
