@@ -36,10 +36,10 @@ const (
 	KeyName      = "key_name"
 	Passphrase   = "passphrase"
 	ServiceName  = "service_name"
-	Schemas      = "schemas"
-	Provider     = "provider"
+	Schemas      = "service_schemas"
+	Provider     = "service_provider"
 	ServiceFee   = "service_fee"
-	QoS          = "qos"
+	QoS          = "service_qos"
 )
 
 // Config is a config struct for IRITA-HUB

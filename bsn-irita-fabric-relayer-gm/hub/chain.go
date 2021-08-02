@@ -165,6 +165,7 @@ func (ic IritaHubChain) SendInterchainRequest(
 	if err != nil {
 		return err
 	}
+	logging.Logger.Infof("BuildServiceInvocationRequest is %v",invokeServiceReq)
 
 	reqCtxID, resTx, err := ic.ServiceClient.InvokeService(invokeServiceReq, ic.BuildBaseTx())
 	if err != nil {
