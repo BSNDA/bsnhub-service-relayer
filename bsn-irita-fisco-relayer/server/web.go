@@ -61,6 +61,7 @@ func (srv *HTTPService) AddChain(c *gin.Context) {
 		return
 	}
 
+	logging.Logger.Infof("AddChain Data is %s",string(bodyBytes))
 	chainID, err := srv.ChainManager.AddChain(bodyBytes)
 	if err != nil {
 		onError(c, http.StatusInternalServerError, err.Error())
@@ -106,6 +107,7 @@ func (srv *HTTPService) UpdateChain(c *gin.Context) {
 		onError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
+	logging.Logger.Infof("UpdateChain Data is %s",string(bodyBytes))
 
 	chainID, err = srv.ChainManager.AddChain(bodyBytes)
 	if err != nil {

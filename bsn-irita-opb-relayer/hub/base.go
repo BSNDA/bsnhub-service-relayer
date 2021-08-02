@@ -6,10 +6,10 @@ type Header struct {
 }
 
 type Body struct {
-	Source `json:"source"`
-	Dest   `json:"dest"`
-	Method string `json:"method"`
-	CallData   []byte `json:"args"`
+	Source   `json:"source"`
+	Dest     `json:"dest"`
+	Method   string `json:"method"`
+	CallData []byte `json:"calldata"`
 }
 
 type Source struct {
@@ -35,4 +35,3 @@ type ServiceInput struct {
 	Header `json:"header"`
 	Body   `json:"body"`
 }
-
