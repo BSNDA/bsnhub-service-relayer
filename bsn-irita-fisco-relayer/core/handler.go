@@ -1,14 +1,15 @@
 package core
 
 import (
-	"relayer/mysql"
+	"relayer/appchains/fisco/store"
+	"strings"
 )
 
 // HandleInterchainRequest handles the interchain request
 func (r *Relayer) HandleInterchainRequest(chainID string, request InterchainRequest, txHash string) error {
 	r.Logger.Infof("got the interchain request on %s: %+v", chainID, request)
 
-	mysql.OnInterchainRequestReceived(request.ID, chainID, txHash)
+
 
 	request.TxHash = txHash
 
@@ -20,7 +21,7 @@ func (r *Relayer) HandleInterchainRequest(chainID string, request InterchainRequ
 		)
 
 		// TODO
-		mysql.OnInterchainRequestHandled()
+		//mysql.OnInterchainRequestHandled()
 
 		err := r.AppChains[chainID].SendResponse(request.ID, response)
 		if err != nil {
@@ -39,8 +40,15 @@ func (r *Relayer) HandleInterchainRequest(chainID string, request InterchainRequ
 		)
 	}
 
-	err := r.HubChain.SendInterchainRequest(request, callback)
+	reqInfo,err := r.HubChain.SendInterchainRequest(request, callback)
 	if err != nil {
+
+		if  ! strings.Contains(err.Error(),"duplicated request sequence"){
+			store.InitRelayerTransRecord(request.ID,chainID,txHash,request.DestChainID,reqInfo.HubReqTxId,reqInfo.IcRequestId,store.TxStatus_Error,err.Error())
+		}else {
+			r.Logger.Infof("duplicated request sequence ! not record trans")
+		}
+
 		r.Logger.Errorf(
 			"failed to handle the interchain request %+v on %s: %s",
 			request,
@@ -50,6 +58,9 @@ func (r *Relayer) HandleInterchainRequest(chainID string, request InterchainRequ
 
 		return err
 	}
+
+	//mysql.OnInterchainRequestReceived(request.ID, chainID, txHash)
+	store.InitRelayerTransRecord(request.ID,chainID,txHash,request.DestChainID,reqInfo.HubReqTxId,reqInfo.IcRequestId,store.TxStatus_Unknow,"")
 	r.Logger.Infof("HandleInterchainRequest is End !!!")
 	return nil
 }

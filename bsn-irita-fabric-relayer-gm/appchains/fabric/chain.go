@@ -1,6 +1,7 @@
 package fabric
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	eventfab "github.com/BSNDA/fabric-sdk-go-gm/pkg/common/providers/fab"
@@ -260,13 +261,19 @@ func (fc *FabricChain) block(cbblock *cb.Block) {
 	}
 
 }
+//convCallData 按照hex base64 string的顺序解析字符串
 func convCallData(data string) []byte {
-	bytes,err :=hexutil.Decode(data)
-	if err !=nil {
-		return []byte(data)
-	}else {
+	bytes, err := hexutil.Decode(data)
+	if err == nil {
 		return bytes
 	}
+
+	bytes, err = base64.StdEncoding.DecodeString(data)
+	if err == nil {
+		return bytes
+	}
+
+	return []byte(data)
 
 }
 
@@ -319,6 +326,16 @@ func (fc *FabricChain) SendResponse(requestID string, response core.ResponseI) e
 		IcRequestId: response.GetInterchainRequestID(),
 	}
 
+	data :=&store.RelayerResInfo{
+		RequestId: requestID,
+		TxStatus: store.TxStatus_Success,
+		ErrMsg: "",
+	}
+	defer func(d *store.RelayerResInfo) {
+
+		store.RelayerResponeRecord(d)
+	}(data)
+
 	resb, _ := json.Marshal(res)
 	request := channel.Request{
 		ChaincodeID: fc.ChainInfo.CrossChainCode,
@@ -328,11 +345,17 @@ func (fc *FabricChain) SendResponse(requestID string, response core.ResponseI) e
 
 	fabres, err := fc.channelClient.Execute(request)
 	if err != nil {
+		data.TxStatus = store.TxStatus_Error
+		data.ErrMsg = fmt.Sprintf("call fabric setResponse failed :%s",err)
 		return errors.New(fmt.Sprintf("call fabric setResponse failed :%s", err))
 	}
 
+	data.FromResTxId = string(fabres.TransactionID)
+
 	if fabres.TxValidationCode != pb.TxValidationCode_VALID {
-		return errors.New(fmt.Sprintf("call fabric setResponse TxValidationCode is %s", fabres.TxValidationCode))
+		data.TxStatus = store.TxStatus_Error
+		data.ErrMsg = fmt.Sprintf("call fabric setResponse TxValidationCode is %s", fabres.TxValidationCode.String())
+		return errors.New(fmt.Sprintf("call fabric setResponse TxValidationCode is %s", fabres.TxValidationCode.String()))
 	}
 
 	// 返回的交易记录 update where 来源 = 0
@@ -344,28 +367,11 @@ func (fc *FabricChain) SendResponse(requestID string, response core.ResponseI) e
 
 	if response.GetErrMsg() == "" {
 		logging.Logger.Infoln("callback no err info")
-		data := entity.FabricRelayerTx{
-			Request_id:     requestID,
-			Ic_request_id:  res.IcRequestId,
-			From_res_tx:    string(fabres.TransactionID),
-			Tx_status:      1,
-			Tx_time:        time.Now(),
-			Source_service: 0,
-		}
-		store.CallBackSendResponse(&data)
 
 	} else {
 		logging.Logger.Infof("callback has err msg :%s", response.GetErrMsg())
-		data := entity.FabricRelayerTx{
-			Request_id:     requestID,
-			Ic_request_id:  res.IcRequestId,
-			From_res_tx:    string(fabres.TransactionID),
-			Tx_status:      2,
-			Error:          response.GetErrMsg(),
-			Tx_time:        time.Now(),
-			Source_service: 0,
-		}
-		store.CallBackSendResponse(&data)
+		data.TxStatus = 2
+		data.ErrMsg = response.GetErrMsg()
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package opb
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -12,12 +13,12 @@ import (
 	sdkstore "github.com/bianjieai/irita-sdk-go/types/store"
 	abci "github.com/tendermint/tendermint/abci/types"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+	txstore "relayer/appchains/opb/store"
 	"strings"
 	"time"
 
 	"relayer/core"
 	"relayer/logging"
-	"relayer/mysql"
 	"relayer/store"
 )
 
@@ -162,33 +163,48 @@ func (opb *OpbChain) SendResponse(requestID string, response core.ResponseI) err
 		WithArgs("request_id", requestID).
 		WithArgs("err_msg", response.GetErrMsg()).
 		WithArgs("output", response.GetOutput())
-	resultTx, err := opb.OpbClient.WASM.Execute(opb.Config.ChainParams.IServiceCoreAddr, execAbi, nil, opb.BuildBaseTx())
-	if err != nil {
-		mysql.TxErrCollection(requestID, err.Error())
-		return err
+
+	data := &txstore.RelayerResInfo{
+		RequestId: requestID,
+		TxStatus:  txstore.TxStatus_Success,
+		ErrMsg:    "",
 	}
 
+	defer func(d *txstore.RelayerResInfo) {
+		txstore.RelayerResponeRecord(d)
+	}(data)
+
+	resultTx, err := opb.OpbClient.WASM.Execute(opb.Config.ChainParams.IServiceCoreAddr, execAbi, nil, opb.BuildBaseTx())
+	if err != nil {
+		data.TxStatus = txstore.TxStatus_Error
+		data.ErrMsg = fmt.Sprintf("call opb setResponse failed :%s", err)
+		//mysql.TxErrCollection(requestID, err.Error())
+		return err
+	}
+	data.FromResTxId = resultTx.Hash
 	// TODO
-	mysql.OnInterchainRequestResponseSent(requestID, resultTx.Hash)
+	//mysql.OnInterchainRequestResponseSent(requestID, resultTx.Hash)
 
 	err = opb.waitForSuccess(resultTx.Hash, "SetResponse")
 	if err != nil {
-		mysql.TxErrCollection(requestID, err.Error())
+		//mysql.TxErrCollection(requestID, err.Error())
+		data.TxStatus = txstore.TxStatus_Error
+		data.ErrMsg = fmt.Sprintf("call opb setResponse failed :%s", err)
 		return err
 	}
 
 	// TODO
-	mysql.OnInterchainRequestSucceeded(requestID)
+	//mysql.OnInterchainRequestSucceeded(requestID)
 
 	return nil
 }
 
 // waitForSuccess waits for the receipt of the given tx
-func (opb *OpbChain) waitForSuccess(txHash string,name string) error {
+func (opb *OpbChain) waitForSuccess(txHash string, name string) error {
 	logging.Logger.Infof("%s: transaction sent to %s, hash: %s", name, opb.GetChainID(), txHash)
 
-	tx, _:= opb.OpbClient.QueryTx(txHash)
-	if tx.Result.Code != 0{
+	tx, _ := opb.OpbClient.QueryTx(txHash)
+	if tx.Result.Code != 0 {
 		return fmt.Errorf("transaction %s execution failed: %s", txHash, tx.Result.Log)
 	}
 
@@ -229,6 +245,8 @@ func (opb *OpbChain) buildInterchainRequest(e abci.Event) core.InterchainRequest
 	if err != nil {
 		logging.Logger.Errorf("failed to decode endpointInfo: %s", err)
 	}
+
+	callDataBytes := convCallData(callData)
 	return core.InterchainRequest{
 		ID:              requestID,
 		SourceChainID:   opb.ChainID,
@@ -238,8 +256,19 @@ func (opb *OpbChain) buildInterchainRequest(e abci.Event) core.InterchainRequest
 		EndpointAddress: endpointInfo.EndpointAddress,
 		EndpointType:    endpointInfo.EndpointType,
 		Method:          method,
-		CallData:        []byte(callData),
+		CallData:        callDataBytes,
 	}
+}
+
+//convCallData 按照hex base64 string的顺序解析字符串
+func convCallData(data string) []byte {
+	bytes, err := base64.StdEncoding.DecodeString(data)
+	if err == nil {
+		return bytes
+	}
+
+	return []byte(data)
+
 }
 
 // monitor is responsible for monitoring the chain
@@ -307,7 +336,7 @@ func (opb *OpbChain) getBlockNumber() (int64, error) {
 		return -1, err
 	}
 
-	return resultState.SyncInfo.LatestBlockHeight,nil
+	return resultState.SyncInfo.LatestBlockHeight, nil
 }
 
 // parseServiceInvokedEvents parses the ServiceInvoked events from the receipt
@@ -316,7 +345,7 @@ func (opb *OpbChain) parseCrossChainRequest(txResults []*abci.ResponseDeliverTx,
 		for _, e := range txResult.Events {
 			if e.Type == "wasm" && len(e.Attributes) > 1 {
 				contractAddr, _ := opb.getAttributeValue(e, "contract_address")
-				if contractAddr == opb.Config.ChainParams.IServiceCoreAddr{
+				if contractAddr == opb.Config.ChainParams.IServiceCoreAddr {
 					request := opb.buildInterchainRequest(e)
 					opb.handler(opb.ChainID, request, strings.ToUpper(hex.EncodeToString(block.Block.Txs[i].Hash())))
 				}

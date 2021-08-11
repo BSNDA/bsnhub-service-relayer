@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"fmt"
 	"github.com/spf13/viper"
 
 	cfg "relayer/config"
@@ -17,11 +18,18 @@ const (
 
 // Config represents the Fabric chain config
 type Config struct {
-	DBName           string   `yaml:"db_name"`
-	DBUserName       string   `yaml:"db_user_name"`
+	DBName           string `yaml:"db_name"`
+	DBUserName       string `yaml:"db_user_name"`
 	DBUserPassphrase string `yaml:"db_user_passphrase"`
-	Host             string   `yaml:"host"`
-	Port             string   `yaml:"port"`
+	Host             string `yaml:"host"`
+	Port             string `yaml:"port"`
+}
+
+func (mysqlConfig *Config) DSN() string {
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true",
+		mysqlConfig.DBUserName, mysqlConfig.DBUserPassphrase, mysqlConfig.Host, mysqlConfig.Port, mysqlConfig.DBName)
+
+	return dsn
 }
 
 // NewConfig constructs a new Config from viper

@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	Source_Relayer = 0
+	Source_Relayer  = 0
 	Source_Provider = 1
 
 	TxStatus_Unknow  = 0
-	TxStatus_Success =1
+	TxStatus_Success = 1
 	TxStatus_Error   = 2
 )
 
@@ -24,13 +24,11 @@ func NowTime() string {
 	return time.Now().Format("2006-01-02 15:04:05")
 }
 
-
 //HandleInterchainRequest 初次处理请求
 
 // Request_id、From_chainid、From_tx、To_chainid
 // 请求HUB  Hub_req_tx、Ic_request_id
 //记录 tx_status 0
-
 
 // InitTransRecord 第一次初始化relauer的交易记录
 func InitRelayerTransRecord(
@@ -46,18 +44,18 @@ func InitRelayerTransRecord(
 ) {
 	//
 
-	logging.Logger.Infof("Init Relayer trans record , requestId is %s,tx status is %d",requestId,txStatus)
+	logging.Logger.Infof("Init Relayer trans record , requestId is %s,tx status is %d", requestId, txStatus)
 
-	insertsql := fmt.Sprintf("INSERT INTO %s ( " +
-		"request_id, " +
-		"from_chainId, " +
-		"from_tx," +
-		"hub_req_tx, " +
-		"ic_request_id ," +
-		"to_chainid ," +
-		"tx_createtime, " +
-		"tx_status, " +
-		"error, " +
+	insertsql := fmt.Sprintf("INSERT INTO %s ( "+
+		"request_id, "+
+		"from_chainId, "+
+		"from_tx,"+
+		"hub_req_tx, "+
+		"ic_request_id ,"+
+		"to_chainid ,"+
+		"tx_createtime, "+
+		"tx_status, "+
+		"error, "+
 		"source_service ) "+
 		"VALUES ( ?, ?, ?,?, ?, ?, ?,?,?,?);", _TabName_cc_Tx)
 
@@ -79,15 +77,14 @@ func InitRelayerTransRecord(
 		logging.Logger.Infof("Init Relayer trans record  lastId:%d ;rows:%d ", lastId, rows)
 	}
 
-
 	return
 }
 
 type RelayerResInfo struct {
-	RequestId string
+	RequestId   string
 	FromResTxId string
-	TxStatus int
-	ErrMsg string
+	TxStatus    int
+	ErrMsg      string
 }
 
 // callback
@@ -95,8 +92,8 @@ type RelayerResInfo struct {
 // 记录 tx_status 1 or 2
 func RelayerResponeRecord(data *RelayerResInfo) {
 
-	logging.Logger.Infof("set relayer callback record , requestId is %s,tx status is %d",data.RequestId,data.TxStatus)
-	sql :=fmt.Sprintf("update %s set from_res_tx = ? ,error = ? ,tx_time =? ,tx_status = ? where request_id = ? and source_service = %d",_TabName_cc_Tx,source_service)
+	logging.Logger.Infof("set relayer callback record , requestId is %s,tx status is %d", data.RequestId, data.TxStatus)
+	sql := fmt.Sprintf("update %s set from_res_tx = ? ,error = ? ,tx_time =? ,tx_status = ? where request_id = ? and source_service = %d", _TabName_cc_Tx, source_service)
 
 	lastId, rows, err := mysql.Exec(sql,
 		data.FromResTxId,
@@ -111,28 +108,24 @@ func RelayerResponeRecord(data *RelayerResInfo) {
 		logging.Logger.Infof("set relayer callback record lastId:%d ;rows:%d ", lastId, rows)
 	}
 
-
 }
-
 
 //requestId ,to_chainid,ic_request_id ,to_tx,hub_res_tx ,tx_status,error,source_service
 
 //InitProviderTransRecord
-func InitProviderTransRecord(requestId ,to_chainid,ic_request_id ,to_tx ,error string,tx_status int)  {
+func InitProviderTransRecord(requestId, to_chainid, ic_request_id, to_tx, error string, tx_status int) {
 
-	logging.Logger.Infof("Init Provider trans record , requestId is %s,tx status is %d",requestId,tx_status)
-	insertsql :=fmt.Sprintf("INSERT INTO %s ( " +
-		"request_id, " +
-		"ic_request_id ," +
-		"to_chainid ," +
-		"to_tx, " +
-		"tx_createtime, " +
-		"tx_status, " +
-		"error, " +
+	logging.Logger.Infof("Init Provider trans record , requestId is %s,tx status is %d", requestId, tx_status)
+	insertsql := fmt.Sprintf("INSERT INTO %s ( "+
+		"request_id, "+
+		"ic_request_id ,"+
+		"to_chainid ,"+
+		"to_tx, "+
+		"tx_createtime, "+
+		"tx_status, "+
+		"error, "+
 		"source_service ) "+
 		"VALUES ( ?, ?, ?,?, ?, ?,?,?);", _TabName_cc_Tx)
-
-
 
 	lastId, rows, err := mysql.Exec(insertsql,
 		requestId,
@@ -154,19 +147,18 @@ func InitProviderTransRecord(requestId ,to_chainid,ic_request_id ,to_tx ,error s
 
 type ProviderResInfo struct {
 	IcRequestId string
-	HUBResTxId string
-	TxStatus int
-	ErrMsg string
+	HUBResTxId  string
+	TxStatus    int
+	ErrMsg      string
 }
 
-
 //ic_request_id ,hub_res_tx
-func ProviderCallBackTransRecord(data *ProviderResInfo )  {
-	logging.Logger.Infof("set provider callback record , ic_requestId is %s,res txid is %s,tx status is %d",data.IcRequestId,data.HUBResTxId,data.TxStatus)
+func ProviderCallBackTransRecord(data *ProviderResInfo) {
+	logging.Logger.Infof("set provider callback record , ic_requestId is %s,tx status is %d", data.IcRequestId, data.TxStatus)
 	if data.IcRequestId == "" {
 		return
 	}
-	sql :=fmt.Sprintf("update %s set hub_res_tx = ? ,error = ? ,tx_time =? ,tx_status = ? where ic_request_id = ? and source_service = %d",_TabName_cc_Tx,source_service)
+	sql := fmt.Sprintf("update %s set hub_res_tx = ? ,error = ? ,tx_time =? ,tx_status = ? where ic_request_id = ? and source_service = %d", _TabName_cc_Tx, source_service)
 
 	lastId, rows, err := mysql.Exec(sql,
 		data.HUBResTxId,
@@ -181,8 +173,6 @@ func ProviderCallBackTransRecord(data *ProviderResInfo )  {
 		logging.Logger.Infof("set relayer callback record lastId:%d ;rows:%d ", lastId, rows)
 	}
 }
-
-
 
 /*
 
@@ -202,35 +192,3 @@ error				relayer/provider
 source_service		relayer/provider
 
 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

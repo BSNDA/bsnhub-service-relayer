@@ -5,12 +5,17 @@ type ChainI interface {
 	GetChainID() string // chain ID getter
 }
 
+type InterchainRequestInfo struct {
+	HubReqTxId  string
+	IcRequestId string
+}
+
 // HubChainI defines the interface to interact with the Hub chain
 type HubChainI interface {
 	ChainI
 
 	// send the interchain request and handle the response with the given callback
-	SendInterchainRequest(request InterchainRequest, cb ResponseCallback) error
+	SendInterchainRequest(request InterchainRequest, cb ResponseCallback) (InterchainRequestInfo, error)
 }
 
 // AppChainI defines the interface to interact with the application chain
@@ -51,7 +56,7 @@ type InterchainRequest struct {
 	SourceChainID   string // source chain ID
 	DestChainID     string // target chain ID
 	DestSubChainID  string // target sub chain ID
-	DestChainType  string // target chain type
+	DestChainType   string // target chain type
 	EndpointAddress string // end point address
 	EndpointType    string // end point type
 	Method          string // method name
@@ -62,8 +67,8 @@ type InterchainRequest struct {
 
 // ResponseI defines the response related interfaces
 type ResponseI interface {
-	GetErrMsg() string              // error msg getter
-	GetOutput() string              // response output getter
+	GetErrMsg() string // error msg getter
+	GetOutput() string // response output getter
 }
 
 // KeyManager defines the key management interface

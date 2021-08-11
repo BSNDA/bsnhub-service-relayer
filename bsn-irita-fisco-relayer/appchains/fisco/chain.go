@@ -15,10 +15,10 @@ import (
 	"github.com/FISCO-BCOS/go-sdk/core/types"
 
 	"relayer/appchains/fisco/iservice"
+	txstore "relayer/appchains/fisco/store"
 	"relayer/common"
 	"relayer/core"
 	"relayer/logging"
-	"relayer/mysql"
 	"relayer/store"
 )
 
@@ -162,25 +162,43 @@ func (f *FISCOChain) SendResponse(requestID string, response core.ResponseI) err
 		return err
 	}
 
+	data :=&txstore.RelayerResInfo{
+		RequestId: requestID,
+		TxStatus: txstore.TxStatus_Success,
+		ErrMsg: "",
+	}
+
+	defer func(d *txstore.RelayerResInfo) {
+		txstore.RelayerResponeRecord(d)
+	}(data)
+
+
 	var requestID32Bytes [32]byte
 	copy(requestID32Bytes[:], requestIDBytes)
 
 	tx, _, err := f.IServiceCoreSession.SetResponse(requestID32Bytes, response.GetErrMsg(), response.GetOutput())
 	if err != nil {
-		mysql.TxErrCollection(requestID, err.Error())
+		data.TxStatus = txstore.TxStatus_Error
+		data.ErrMsg = fmt.Sprintf("call fisco setResponse failed :%s",err)
+
 		return err
 	}
 
+	data.FromResTxId = tx.Hash().Hex()
+
 	// TODO
-	mysql.OnInterchainRequestResponseSent(requestID, tx.Hash().Hex())
+	//mysql.OnInterchainRequestResponseSent(requestID, tx.Hash().Hex())
 
 	err = f.waitForReceipt(tx, "SetResponse")
 	if err != nil {
+
+		data.TxStatus = txstore.TxStatus_Error
+		data.ErrMsg = fmt.Sprintf("call fisco setResponse failed :%s",err)
 		return err
 	}
 
 	// TODO
-	mysql.OnInterchainRequestSucceeded(requestID)
+	//mysql.OnInterchainRequestSucceeded(requestID)
 
 	return nil
 }
