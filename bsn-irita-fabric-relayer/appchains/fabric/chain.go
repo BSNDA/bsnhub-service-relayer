@@ -251,6 +251,7 @@ func (fc *FabricChain) blockevent(event *eventfab.BlockEvent) {
 
 //convCallData 按照hex base64 string的顺序解析字符串
 func convCallData(data string) []byte {
+	logging.Logger.Infof("Convert CallData : %s",data)
 	bytes, err := hexutil.Decode(data)
 	if err == nil {
 		return bytes

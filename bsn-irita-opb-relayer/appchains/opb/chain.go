@@ -262,6 +262,7 @@ func (opb *OpbChain) buildInterchainRequest(e abci.Event) core.InterchainRequest
 
 //convCallData 按照hex base64 string的顺序解析字符串
 func convCallData(data string) []byte {
+	logging.Logger.Infof("Convert CallData : %s",data)
 	bytes, err := base64.StdEncoding.DecodeString(data)
 	if err == nil {
 		return bytes

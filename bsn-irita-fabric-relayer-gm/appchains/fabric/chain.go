@@ -141,7 +141,7 @@ func (f *FabricChain) Stop() error {
 func (fc *FabricChain) InterchainEventListener(chanErr chan *errors.ChanError) {
 
 	fi := func(block *cb.Block) bool {
-		logging.Logger.Infof("block filter number is %d",block.Header.Number)
+		logging.Logger.Infof("block filter number is %d", block.Header.Number)
 		//fc.block(block)
 		return true
 	}
@@ -177,22 +177,22 @@ func (fc *FabricChain) InterchainEventListener(chanErr chan *errors.ChanError) {
 
 }
 
-func (fc *FabricChain) chainCodeEvent(event *eventfab.CCEvent)()  {
+func (fc *FabricChain) chainCodeEvent(event *eventfab.CCEvent) {
 
-	logging.Logger.Infof("event.EventName : %s",event.EventName)
-	logging.Logger.Infof("event.BlockNumber : %s",event.BlockNumber)
-	logging.Logger.Infof("event.ChaincodeID : %s",event.ChaincodeID)
-	logging.Logger.Infof("event.Payload : %s",string(event.Payload))
+	logging.Logger.Infof("event.EventName : %s", event.EventName)
+	logging.Logger.Infof("event.BlockNumber : %s", event.BlockNumber)
+	logging.Logger.Infof("event.ChaincodeID : %s", event.ChaincodeID)
+	logging.Logger.Infof("event.Payload : %s", string(event.Payload))
 
 }
-func (fc *FabricChain) blockevent(event *eventfab.BlockEvent){
+func (fc *FabricChain) blockevent(event *eventfab.BlockEvent) {
 	fc.block(event.Block)
 }
 
 func (fc *FabricChain) block(cbblock *cb.Block) {
 	block, err := ParseBlock(cbblock)
 	if err != nil || len(block.Transactions) <= 0 {
-		logging.Logger.Errorf("ParseBlock has error is %v",err)
+		logging.Logger.Errorf("ParseBlock has error is %v", err)
 		return
 	}
 	logging.Logger.Infof("channelID:%s,blockNumber:%d;blockHash:%s,chainID:%s", fc.ChainInfo.ChannelId, block.BlockNumber, block.BlockHash, fc.ChainInfo.GetChainId())
@@ -212,8 +212,8 @@ func (fc *FabricChain) block(cbblock *cb.Block) {
 							logging.Logger.Errorf("failed to decode endpointInfo: %s", err)
 						}
 						if err == nil && request != nil && request.Response == nil {
-							logging.Logger.Infof("CallData is %s ",request.Request.CallData)
-							callDataBytes :=convCallData(request.Request.CallData)
+							logging.Logger.Infof("CallData is %s ", request.Request.CallData)
+							callDataBytes := convCallData(request.Request.CallData)
 							event := core.InterchainRequest{
 								ID:              request.Request.RequestId,
 								SourceChainID:   fc.GetChainID(),
@@ -261,8 +261,10 @@ func (fc *FabricChain) block(cbblock *cb.Block) {
 	}
 
 }
+
 //convCallData 按照hex base64 string的顺序解析字符串
 func convCallData(data string) []byte {
+	logging.Logger.Infof("Convert CallData : %s", data)
 	bytes, err := hexutil.Decode(data)
 	if err == nil {
 		return bytes
@@ -276,7 +278,6 @@ func convCallData(data string) []byte {
 	return []byte(data)
 
 }
-
 
 func (fc *FabricChain) getServiceInfo(requestId string) (*serviceCallInfo, error) {
 	request := channel.Request{
@@ -326,10 +327,10 @@ func (fc *FabricChain) SendResponse(requestID string, response core.ResponseI) e
 		IcRequestId: response.GetInterchainRequestID(),
 	}
 
-	data :=&store.RelayerResInfo{
+	data := &store.RelayerResInfo{
 		RequestId: requestID,
-		TxStatus: store.TxStatus_Success,
-		ErrMsg: "",
+		TxStatus:  store.TxStatus_Success,
+		ErrMsg:    "",
 	}
 	defer func(d *store.RelayerResInfo) {
 
@@ -346,7 +347,7 @@ func (fc *FabricChain) SendResponse(requestID string, response core.ResponseI) e
 	fabres, err := fc.channelClient.Execute(request)
 	if err != nil {
 		data.TxStatus = store.TxStatus_Error
-		data.ErrMsg = fmt.Sprintf("call fabric setResponse failed :%s",err)
+		data.ErrMsg = fmt.Sprintf("call fabric setResponse failed :%s", err)
 		return errors.New(fmt.Sprintf("call fabric setResponse failed :%s", err))
 	}
 
