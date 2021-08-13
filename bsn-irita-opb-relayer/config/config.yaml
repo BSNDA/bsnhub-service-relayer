@@ -24,6 +24,7 @@ opb:
     passphrase: 1234567890
     default_fee: 2000000uirita
     monitor_interval: 1 # chain monitoring interval in seconds
+    timeout: 20
 
 # mysql config
 mysql:
