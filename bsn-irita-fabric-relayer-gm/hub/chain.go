@@ -8,15 +8,12 @@ import (
 	"github.com/irisnet/service-sdk-go/service"
 	"github.com/irisnet/service-sdk-go/types"
 	"github.com/irisnet/service-sdk-go/types/store"
-	"relayer/appchains/fabric/entity"
 	"relayer/common"
 	"time"
 
-	txstore "relayer/appchains/fabric/store"
 	"relayer/core"
 	"relayer/logging"
 )
-
 
 type ServiceInfo struct {
 	ServiceName string
@@ -69,7 +66,6 @@ func NewIritaHubChain(
 		keyPath = defaultKeyPath
 	}
 
-
 	if len(serviceName) == 0 {
 		serviceName = defaultServiceName
 	}
@@ -108,12 +104,12 @@ func NewIritaHubChain(
 	}
 
 	hub := IritaHubChain{
-		ChainID:       chainID,
-		NodeRPCAddr:   nodeRPCAddr,
-		KeyPath:       keyPath,
-		KeyName:       keyName,
-		Passphrase:    passphrase,
-		ServiceInfo:   ServiceInfo{
+		ChainID:     chainID,
+		NodeRPCAddr: nodeRPCAddr,
+		KeyPath:     keyPath,
+		KeyName:     keyName,
+		Passphrase:  passphrase,
+		ServiceInfo: ServiceInfo{
 			ServiceName: serviceName,
 			Schemas:     schemas,
 			Provider:    provider,
@@ -152,56 +148,37 @@ func (ic IritaHubChain) GetChainID() string {
 func (ic IritaHubChain) SendInterchainRequest(
 	request core.InterchainRequest,
 	cb core.ResponseCallback,
-) error {
+) (core.InterchainRequestInfo,error) {
+
+	info :=core.InterchainRequestInfo{}
 
 	invokeServiceReq, err := ic.BuildServiceInvocationRequest(request)
 
-	defer func() {
-		if err != nil {
-			txstore.SetErrorTransRecord(request.ID, err.Error())
-		}
-	}()
-
 	if err != nil {
-		return err
+		return info,err
 	}
-	logging.Logger.Infof("BuildServiceInvocationRequest is %v",invokeServiceReq)
+
+	logging.Logger.Infof("BuildServiceInvocationRequest is %v", invokeServiceReq)
 
 	reqCtxID, resTx, err := ic.ServiceClient.InvokeService(invokeServiceReq, ic.BuildBaseTx())
 	if err != nil {
-		return err
+		return info,err
 	}
 
+	info.HubReqTxId=resTx.Hash
 	logging.Logger.Infof("request context created on %s: %s", ic.ChainID, reqCtxID)
 
 	requests, err := ic.ServiceClient.QueryRequestsByReqCtx(reqCtxID, 1)
 	if err != nil {
-		return err
+		return info,err
 	}
-
+	info.IcRequestId=requests[0].ID
 	if len(requests) == 0 {
-		// todo
-		txstore.SetErrorTransRecord(request.ID, "ServiceClient.QueryRequestsByReqCtx requests is 0")
-		return fmt.Errorf("no service request initiated on %s", ic.ChainID)
+		return info,fmt.Errorf("no service request initiated on %s", ic.ChainID)
 	}
-
-	// Send to HUB Request Info
-	// 交易记录 update
-	// request_id		[request.ID]
-	// hub_req_tx
-	// ic_request_id  requests[0].ID
-
-	data := entity.FabricRelayerTx{
-		Request_id:     request.ID,
-		Hub_req_tx:     resTx.Hash,
-		Ic_request_id:  requests[0].ID,
-		Source_service: 0,
-	}
-	txstore.SendHUBRequestInfo(&data)
-
 	logging.Logger.Infof("service request initiated on %s: %s", ic.ChainID, requests[0].ID)
 
-	return ic.ResponseListener(reqCtxID, requests[0].ID, cb)
+	return info,ic.ResponseListener(reqCtxID, requests[0].ID, cb)
 }
 
 // BuildServiceInvocationRequest builds the service invocation request from the given interchain request
@@ -229,8 +206,8 @@ func (ic IritaHubChain) BuildServiceInvocationRequest(
 				EndpointType:    request.EndpointType,
 				EndpointAddress: request.EndpointAddress,
 			},
-			Method: request.Method,
-			CallData:   request.CallData,
+			Method:   request.Method,
+			CallData: request.CallData,
 		},
 	}
 

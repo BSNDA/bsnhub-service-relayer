@@ -162,7 +162,7 @@ type ProviderResInfo struct {
 
 //ic_request_id ,hub_res_tx
 func ProviderCallBackTransRecord(data *ProviderResInfo )  {
-	logging.Logger.Infof("set provider callback record , ic_requestId is %s,res txid is %s,tx status is %d",data.IcRequestId,data.HUBResTxId,data.TxStatus)
+	logging.Logger.Infof("set provider callback record , ic_requestId is %s,tx status is %d",data.IcRequestId,data.TxStatus)
 	if data.IcRequestId == "" {
 		return
 	}

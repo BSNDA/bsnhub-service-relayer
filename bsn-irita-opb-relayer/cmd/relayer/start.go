@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"relayer/appchains"
+	txStore "relayer/appchains/opb/store"
 	cfg "relayer/config"
 	"relayer/core"
 	"relayer/hub"
@@ -46,8 +47,10 @@ func StartCmd() *cobra.Command {
 			}
 
 			mysqlConfig := mysql.NewConfig(config)
-			mysql.NewDB(mysqlConfig)
-			defer mysql.Close()
+
+			txStore.InitMysql(mysqlConfig.DSN())
+			//mysql.NewDB(mysqlConfig)
+			//defer mysql.Close()
 
 			appChainFactory := appchains.NewAppChainFactory(store)
 			hubChain := hub.BuildIritaHubChain(hub.NewConfig(config))
@@ -92,7 +95,6 @@ func StartCmd() *cobra.Command {
 			}
 
 			chainManager := server.NewChainManager(relayerInstance)
-
 
 			httpPort := config.GetInt(_HttpPort)
 			if httpPort == 0 {

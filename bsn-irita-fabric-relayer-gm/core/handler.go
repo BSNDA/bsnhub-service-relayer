@@ -28,7 +28,7 @@ func (r *Relayer) HandleInterchainRequest(chainID string, request InterchainRequ
 		)
 	}
 
-	err := r.HubChain.SendInterchainRequest(request, callback)
+	_,err := r.HubChain.SendInterchainRequest(request, callback)
 	if err != nil {
 		r.Logger.Errorf(
 			"failed to handle the interchain request %+v on %s: %s",

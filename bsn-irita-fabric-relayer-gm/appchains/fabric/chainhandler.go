@@ -10,7 +10,7 @@ import (
 	"relayer/core"
 	"relayer/errors"
 	"relayer/logging"
-	"time"
+	"strings"
 )
 
 const (
@@ -235,16 +235,17 @@ func (r *fabricHandler) HandleInterchainRequest(chainID string, request core.Int
 	// tx_status 0 未知
 	// source_service 0 relayer
 
-	interchainRequestInfo := entity.FabricRelayerTx{
-		Request_id:     request.ID,
-		From_chainid:   chainID,
-		From_tx:        txHash,
-		Tx_createtime:  time.Now(),
-		Tx_status:      0,
-		Source_service: 0,
-	}
+	//interchainRequestInfo := entity.FabricRelayerTx{
+	//	Request_id:     request.ID,
+	//	From_chainid:   chainID,
+	//	From_tx:        txHash,
+	//	To_chainid: request.DestChainID,
+	//	Tx_createtime:  time.Now(),
+	//	Tx_status:      0,
+	//	Source_service: 0,
+	//}
 
-	store.InsertInterchainRequestInfo(&interchainRequestInfo)
+	//store.InsertInterchainRequestInfo(&interchainRequestInfo)
 
 	callback := func(icRequestID string, response core.ResponseI) {
 		// 跨链交易回复
@@ -272,8 +273,15 @@ func (r *fabricHandler) HandleInterchainRequest(chainID string, request core.Int
 		)
 	}
 
-	err := r.HubChain.SendInterchainRequest(request, callback)
+	reqInfo,err := r.HubChain.SendInterchainRequest(request, callback)
+	//todo InitRelayerTransRecord
 	if err != nil {
+		if  ! strings.Contains(err.Error(),"duplicated request sequence"){
+			store.InitRelayerTransRecord(request.ID,chainID,txHash,request.DestChainID,reqInfo.HubReqTxId,reqInfo.IcRequestId,store.TxStatus_Error,err.Error())
+		}else {
+			r.Logger.Infof("duplicated request sequence ! not record trans")
+		}
+
 		r.Logger.Errorf(
 			"failed to handle the interchain request %+v on %s: %s",
 			request,
@@ -283,7 +291,7 @@ func (r *fabricHandler) HandleInterchainRequest(chainID string, request core.Int
 
 		return err
 	}
-
+	store.InitRelayerTransRecord(request.ID,chainID,txHash,request.DestChainID,reqInfo.HubReqTxId,reqInfo.IcRequestId,store.TxStatus_Unknow,"")
 	r.Logger.Infof("HandleInterchainRequest is End !!!")
 	return nil
 }

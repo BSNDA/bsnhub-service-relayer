@@ -8,11 +8,10 @@ import (
 	"github.com/bianjieai/irita-sdk-go/modules/service"
 	"github.com/bianjieai/irita-sdk-go/types"
 	"github.com/bianjieai/irita-sdk-go/types/store"
-	"time"
 	"relayer/common"
 	"relayer/core"
 	"relayer/logging"
-	"relayer/mysql"
+	"time"
 )
 
 type ServiceInfo struct {
@@ -32,7 +31,7 @@ type IritaHubChain struct {
 	KeyName    string
 	Passphrase string
 
-	ServiceInfo   ServiceInfo
+	ServiceInfo ServiceInfo
 	IritaClient servicesdk.IRITAClient
 }
 
@@ -154,35 +153,39 @@ func (ic IritaHubChain) GetChainID() string {
 func (ic IritaHubChain) SendInterchainRequest(
 	request core.InterchainRequest,
 	cb core.ResponseCallback,
-) error {
+) (core.InterchainRequestInfo, error) {
+
+	info := core.InterchainRequestInfo{}
+
 	invokeServiceReq, err := ic.BuildServiceInvocationRequest(request)
 	if err != nil {
-		return err
+		return info, err
 	}
 
 	reqCtxID, resTx, err := ic.IritaClient.Service.InvokeService(invokeServiceReq, ic.BuildBaseTx())
 	if err != nil {
-		mysql.TxErrCollection(request.ID, err.Error())
-		return err
+		//mysql.TxErrCollection(request.ID, err.Error())
+		return info, err
 	}
-
+	info.HubReqTxId = resTx.Hash
 	logging.Logger.Infof("request context created on %s: %s", ic.ChainID, reqCtxID)
 
-	requests, err := ic.IritaClient.Service.QueryRequestsByReqCtx(reqCtxID, 1,nil)
+	requests, err := ic.IritaClient.Service.QueryRequestsByReqCtx(reqCtxID, 1, nil)
 	if err != nil {
-		return err
+		return info, err
 	}
 
 	if len(requests) == 0 {
-		return fmt.Errorf("no service request initiated on %s", ic.ChainID)
+		return info, fmt.Errorf("no service request initiated on %s", ic.ChainID)
 	}
 
+	info.IcRequestId = requests[0].ID
 	// TODO
-	mysql.OnInterchainRequestSent(request.ID, requests[0].ID, resTx.Hash)
+	//mysql.OnInterchainRequestSent(request.ID, requests[0].ID, resTx.Hash)
 
 	logging.Logger.Infof("service request initiated on %s: %s", ic.ChainID, requests[0].ID)
 
-	return ic.ResponseListener(reqCtxID, requests[0].ID, cb)
+	return info, ic.ResponseListener(reqCtxID, requests[0].ID, cb)
 }
 
 // BuildServiceInvocationRequest builds the service invocation request from the given interchain request
@@ -210,8 +213,8 @@ func (ic IritaHubChain) BuildServiceInvocationRequest(
 				EndpointType:    request.EndpointType,
 				EndpointAddress: request.EndpointAddress,
 			},
-			Method: request.Method,
-			CallData:   request.CallData,
+			Method:   request.Method,
+			CallData: request.CallData,
 		},
 	}
 

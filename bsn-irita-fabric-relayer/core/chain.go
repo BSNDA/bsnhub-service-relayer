@@ -5,12 +5,17 @@ type ChainI interface {
 	GetChainID() string // chain ID getter
 }
 
+type InterchainRequestInfo struct {
+	HubReqTxId string
+	IcRequestId string
+}
+
 // HubChainI defines the interface to interact with the Hub chain
 type HubChainI interface {
 	ChainI
 
 	// send the interchain request and handle the response with the given callback
-	SendInterchainRequest(request InterchainRequest, cb ResponseCallback) error
+	SendInterchainRequest(request InterchainRequest, cb ResponseCallback) (InterchainRequestInfo,error)
 }
 
 // AppChainI defines the interface to interact with the application chain

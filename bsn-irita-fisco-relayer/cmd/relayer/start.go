@@ -12,6 +12,8 @@ import (
 	"relayer/mysql"
 	"relayer/server"
 	"relayer/store"
+
+	txstore "relayer/appchains/fisco/store"
 )
 
 const (
@@ -46,8 +48,10 @@ func StartCmd() *cobra.Command {
 			}
 
 			mysqlConfig := mysql.NewConfig(config)
-			mysql.NewDB(mysqlConfig)
-			defer mysql.Close()
+
+			txstore.InitMysql(mysqlConfig.DSN())
+			//mysql.NewDB(mysqlConfig)
+			//defer mysql.Close()
 
 			appChainFactory := appchains.NewAppChainFactory(store)
 			hubChain := hub.BuildIritaHubChain(hub.NewConfig(config))

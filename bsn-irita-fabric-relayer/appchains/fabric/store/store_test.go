@@ -135,52 +135,68 @@ func TestStoreRelayerTxResInfo(t *testing.T) {
 		t.Errorf(err.Error())
 	}
 }
+//
+//func TestInsertInterchainRequestInfo(t *testing.T) {
+//
+//	db := "root:123456@tcp(192.168.1.60:3306)/bsnflowdb?charset=utf8"
+//
+//	InitMysql(db)
+//
+//	relayerTx := entity.FabricRelayerTx{
+//		Request_id:    "1995",
+//		From_chainid:  "11",
+//		From_tx:       "rong",
+//		Tx_createtime: time.Now(),
+//	}
+//
+//	InsertInterchainRequestInfo(&relayerTx)
+//}
+//
+//func TestSendHUBRequestInfo(t *testing.T) {
+//
+//	db := "root:123456@tcp(192.168.1.60:3306)/bsnflowdb?charset=utf8"
+//
+//	InitMysql(db)
+//
+//	relayerTx := entity.FabricRelayerTx{
+//		Request_id:    "1995",
+//		Hub_req_tx:    "11",
+//		Ic_request_id: "rong",
+//	}
+//
+//	SendHUBRequestInfo(&relayerTx)
+//
+//}
+//
+//func TestCallBackSendResponse(t *testing.T) {
+//
+//	db := "root:123456@tcp(192.168.1.60:3306)/bsnflowdb?charset=utf8"
+//
+//	InitMysql(db)
+//
+//	relayerTx := entity.FabricRelayerTx{
+//		Request_id:    "1995",
+//		Ic_request_id: "rong",
+//		From_res_tx:   "222",
+//		Tx_time:       time.Now(),
+//	}
+//
+//	CallBackSendResponse(&relayerTx)
+//
+//}
 
-func TestInsertInterchainRequestInfo(t *testing.T) {
-
-	db := "root:123456@tcp(192.168.1.60:3306)/bsnflowdb?charset=utf8"
-
-	InitMysql(db)
-
-	relayerTx := entity.FabricRelayerTx{
-		Request_id:    "1995",
-		From_chainid:  "11",
-		From_tx:       "rong",
-		Tx_createtime: time.Now(),
+func TestRelayerResponeRecord(t *testing.T) {
+	data :=&RelayerResInfo{
+		RequestId: "requestID",
+		TxStatus: TxStatus_Success,
+		ErrMsg: "",
 	}
+	defer func(d *RelayerResInfo) {
 
-	InsertInterchainRequestInfo(&relayerTx)
-}
+		fmt.Println(d.RequestId)
+	}(data)
 
-func TestSendHUBRequestInfo(t *testing.T) {
 
-	db := "root:123456@tcp(192.168.1.60:3306)/bsnflowdb?charset=utf8"
-
-	InitMysql(db)
-
-	relayerTx := entity.FabricRelayerTx{
-		Request_id:    "1995",
-		Hub_req_tx:    "11",
-		Ic_request_id: "rong",
-	}
-
-	SendHUBRequestInfo(&relayerTx)
-
-}
-
-func TestCallBackSendResponse(t *testing.T) {
-
-	db := "root:123456@tcp(192.168.1.60:3306)/bsnflowdb?charset=utf8"
-
-	InitMysql(db)
-
-	relayerTx := entity.FabricRelayerTx{
-		Request_id:    "1995",
-		Ic_request_id: "rong",
-		From_res_tx:   "222",
-		Tx_time:       time.Now(),
-	}
-
-	CallBackSendResponse(&relayerTx)
+	data.RequestId = "123456"
 
 }
