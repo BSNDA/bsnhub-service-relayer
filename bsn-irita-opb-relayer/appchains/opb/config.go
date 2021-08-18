@@ -20,6 +20,7 @@ const (
 	GrpcAddrsMap    = "grpc_addrs"
 	MonitorInterval = "monitor_interval"
 	DefaultFee   = "default_fee"
+	DefaultGas   = "default_gas"
 	Timeout         = "timeout"
 )
 
@@ -33,6 +34,7 @@ type BaseConfig struct {
 	ChainId         string
 	DefaultFee      string
 	Timeout         uint
+	DefaultGas   uint64
 	MonitorInterval uint64
 }
 
@@ -56,6 +58,7 @@ func NewBaseConfig(v *viper.Viper) (*BaseConfig, error) {
 	config.GrpcAddrsMap = v.GetStringMapString(cfg.GetConfigKey(Prefix, GrpcAddrsMap))
 	config.Timeout = v.GetUint(cfg.GetConfigKey(Prefix, Timeout))
 	config.DefaultFee = v.GetString(cfg.GetConfigKey(Prefix, DefaultFee))
+	config.DefaultGas = v.GetUint64(cfg.GetConfigKey(Prefix, DefaultGas))
 	config.MonitorInterval = v.GetUint64(cfg.GetConfigKey(Prefix, MonitorInterval))
 
 	return config, nil

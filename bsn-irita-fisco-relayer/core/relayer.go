@@ -80,6 +80,7 @@ func (r *Relayer) DeleteChain(chainID string) error {
 	if err := chain.Stop(); err != nil {
 		return err
 	}
+	chain.Close()
 	delete(r.AppChains, chainID)
 	delete(r.AppChainStates, chainID)
 	r.AppChainFactory.DeleteChainConfig(r.AppChainType, chainID)

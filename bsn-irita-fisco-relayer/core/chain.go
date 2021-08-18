@@ -33,6 +33,8 @@ type AppChainI interface {
 
 	// send the response to the application chain
 	SendResponse(requestID string, response ResponseI) error
+
+	Close()
 }
 
 // AppChainFactoryI abstracts the application chain operation interface
