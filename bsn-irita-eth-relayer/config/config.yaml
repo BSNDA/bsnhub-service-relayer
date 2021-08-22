@@ -1,0 +1,42 @@
+base:
+    app_chain_type: fisco # application chain type
+    store_path: .db # store path
+    http_port: 8082
+
+# irita-hub config
+hub:
+    chain_id: irita
+    node_rpc_addr: http://127.0.0.1:26657
+    node_grpc_addr: 127.0.0.1:9090
+    key_path: .keys
+    key_name: node0
+    passphrase: 1234567890
+
+# ethereum config
+eth:
+    chain_id: ropsten
+    node_rpc_addr: wss://ropsten.infura.io/ws/v3/56e89587eacb4fbe8655e4c44b146237
+    gas_limit: 2000000
+    gas_price: 5000000000
+    key: 5dee232c8be5cb81f0ae6fddb45243fc6208192c16aef275ef41b019df765d1f
+    passphrase: 123456789
+    iservice_core_addr: 0x79b6c1ab5dbeba4879bfbea35a78fac8e6c73c92
+    iservice_market_addr: 0x87e71e95fbd95d66e307edaeb7974c1f17f87a82
+    iservice_event_name: ServiceInvoked
+    iservice_event_sig: ServiceInvoked(bytes32,string,string,uint256)
+
+# mysql config
+mysql:
+    db_name: relayer
+    db_user_name: root
+    db_user_passphrase: 123456
+    host: localhost
+    port: 3306
+
+# service config
+service:
+    service_name: cc-contract-call
+    schemas:  '{"input":{"type":"object"},"output":{"type:"object"}}'
+    provider: iaa1fe6gm5kyam6xfs0wngw3d23l9djlyw82xxcjm2
+    service_fee: 1000000upoint
+    qos: 100
