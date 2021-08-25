@@ -1,4 +1,5 @@
-pragma solidity ^0.4.24;
+//SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.7;
 
 /**
  * @title iService interface
@@ -14,9 +15,9 @@ interface iServiceInterface {
      * @return requestID Request id
      */
     function sendRequest(
-        string _endpointInfo,
-        string _method,
-        bytes _callData,
+        string memory _endpointInfo,
+        string memory _method,
+        bytes memory _callData,
         address _callbackAddress,
         bytes4 _callbackFunction
     ) external returns (bytes32 requestID);
@@ -30,8 +31,8 @@ interface iServiceInterface {
      */
     function setResponse(
         bytes32 _requestID,
-        string _errMsg,
-        string _output
+        string memory _errMsg,
+        string memory _output
     ) external returns (bool);
 }
 
@@ -80,9 +81,9 @@ contract iServiceClient {
      * @return requestID Request id
      */
     function sendIServiceRequest(
-        string _endpointInfo,
-        string _method,
-        bytes _callData,
+        string memory _endpointInfo,
+        string memory _method,
+        bytes memory _callData,
         address _callbackAddress,
         bytes4 _callbackFunction
     )
@@ -112,7 +113,7 @@ contract iServiceClient {
      */
     function onResponse(
         bytes32 _requestID,
-        string _output
+        string memory _output
     )
     external
     validRequest(_requestID)
@@ -120,7 +121,8 @@ contract iServiceClient {
         address cbAddr = requests[_requestID].callbackAddress;
         bytes4 cbFunc = requests[_requestID].callbackFunction;
 
-        cbAddr.call(abi.encodeWithSelector(cbFunc, _requestID, _output));
+        (bool success,) = cbAddr.call(abi.encodeWithSelector(cbFunc, _requestID, _output));
+        if (!success) revert();
     }
 
     /**
@@ -132,5 +134,3 @@ contract iServiceClient {
         iServiceCore = iServiceInterface(_iServiceCore);
     }
 }
-
-

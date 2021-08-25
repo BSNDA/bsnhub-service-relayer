@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
-	"net/http"
 	_ "net/http/pprof"
 	"relayer/appchains"
 	cfg "relayer/config"
@@ -104,7 +103,6 @@ func StartCmd() *cobra.Command {
 				httpPort = 8082
 			}
 
-			http.ListenAndServe("0.0.0.0:6060", nil)
 			server.StartWebServer(chainManager, httpPort)
 
 			return nil

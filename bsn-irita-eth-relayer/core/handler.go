@@ -1,7 +1,7 @@
 package core
 
 import (
-	"relayer/appchains/fisco/store"
+	"relayer/appchains/eth/store"
 	"strings"
 )
 

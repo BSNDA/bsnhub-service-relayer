@@ -1,4 +1,5 @@
-pragma solidity ^0.4.24;
+//SPDX-License-Identifier: SimPL-2.0
+pragma solidity ^0.8.7;
 
 import "./vendor/Ownable.sol";
 import "./interfaces/iServiceInterface.sol";
@@ -46,7 +47,7 @@ contract iServiceCoreEx is iServiceInterface, Ownable {
      * @dev Constructor
      * @param _relayer Relayer address
      */
-    constructor(address _relayer, string _sourceChainID) public Ownable() {
+    constructor(address _relayer, string memory _sourceChainID) Ownable() {
         sourceChainID = _sourceChainID;
         if (_relayer != address(0)) {
             relayer = _relayer;
@@ -59,9 +60,9 @@ contract iServiceCoreEx is iServiceInterface, Ownable {
      * @dev Make sure that the request is valid
      */
     modifier checkRequest(
-        string _endpointInfo,
-        string _method,
-        bytes _callData
+        string memory _endpointInfo,
+        string memory _method,
+        bytes memory _callData
     ) {
         require(
             bytes(_endpointInfo).length > 0,
@@ -113,13 +114,14 @@ contract iServiceCoreEx is iServiceInterface, Ownable {
      * @return requestID Request id
      */
     function sendRequest(
-        string _endpointInfo,
-        string _method,
-        bytes _callData,
+        string memory _endpointInfo,
+        string memory _method,
+        bytes memory _callData,
         address _callbackAddress,
         bytes4 _callbackFunction
     )
     external
+    override
     checkRequest(_endpointInfo, _method, _callData)
     returns (bytes32 requestID)
     {
@@ -149,9 +151,9 @@ contract iServiceCoreEx is iServiceInterface, Ownable {
      */
     function setResponse(
         bytes32 _requestID,
-        string _errMsg,
-        string _output
-    ) external onlyRelayer validateRequest(_requestID) returns (bool) {
+        string memory _errMsg,
+        string memory _output
+    ) external override onlyRelayer validateRequest(_requestID) returns (bool) {
         Callback memory cb = callbacks[_requestID];
 
         string memory result;
@@ -163,7 +165,7 @@ contract iServiceCoreEx is iServiceInterface, Ownable {
         }
 
         requests[_requestID] = true;
-        bool success =
+        (bool success, ) =
         cb.callbackAddress.call(
             abi.encodeWithSelector(
                 cb.functionSelector,

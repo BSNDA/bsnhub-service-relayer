@@ -5,52 +5,58 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"math/big"
 	"strings"
 	"time"
 
 	ethcmn "github.com/ethereum/go-ethereum/common"
 
-	"github.com/FISCO-BCOS/go-sdk/abi"
-	fiscoclient "github.com/FISCO-BCOS/go-sdk/client"
-	"github.com/FISCO-BCOS/go-sdk/core/types"
-
-	"relayer/appchains/fisco/iservice"
-	txstore "relayer/appchains/fisco/store"
-	"relayer/common"
+	"relayer/appchains/eth/iservice"
+	txstore "relayer/appchains/eth/store"
 	"relayer/core"
 	"relayer/logging"
 	"relayer/store"
 )
 
-// FISCOChain defines the FISCO chain
-type FISCOChain struct {
+// EthChain defines the Eth chain
+type EthChain struct {
 	Config  Config
-	Client  *fiscoclient.Client
+	Client  *ethclient.Client
 	ChainID string // unique chain ID
 
-	IServiceCoreSession *iservice.IServiceCoreExSession // iService Core Extension contract session
-	IServiceCoreABI     abi.ABI                         // parsed iService Core Extension ABI
+	IServiceCoreContract *iservice.IServiceCoreEx // iService Core Extension contract
+	IServiceCoreABI      abi.ABI                  // parsed iService Core Extension ABI
 
-	store      *store.Store // store backend instance
-	lastHeight int64        // last height
-
-	done    bool                          // indicates if the chain monitor is done
-	handler core.InterchainRequestHandler // handler for the interchain request
+	store              *store.Store // store backend instance
+	done    bool
+	ClientSubscription ethereum.Subscription
 }
 
-// NewFISCOChain constructs a new FISCOChain instance
-func NewFISCOChain(
+// NewEthChain constructs a new EthChain instance
+func NewEthChain(
 	config Config,
 	store *store.Store,
-) (*FISCOChain, error) {
-	clientConfig := BuildClientConfig(config)
+) (*EthChain, error) {
 
-	client, err := fiscoclient.Dial(clientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to fisco node: %s", err)
+	nodeName := randURL(config.NodeURLs)
+	//获取配置的nodeURL
+	nodeUrl, ok := config.NodesMap[nodeName]
+	if ok {
+		nodeName = nodeUrl
 	}
 
-	iServiceCoreABI, err := abi.JSON(strings.NewReader(iservice.IServiceCoreExABI))
+	client, err := ethclient.Dial(nodeUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to eth node: %s", err)
+	}
+
+	iServiceCoreABI, err := abi.JSON(strings.NewReader(iservice.IServiceCoreExMetaData.ABI))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse iService Core Extension ABI: %s", err)
 	}
@@ -60,40 +66,35 @@ func NewFISCOChain(
 		return nil, fmt.Errorf("failed to instantiate the iService Core Extension contract: %s", err)
 	}
 
-	if config.MonitorInterval == 0 {
-		config.MonitorInterval = DefaultMonitorInterval
-	}
-
 	chainID := GetChainID(config.ChainParams)
 
-	fisco := &FISCOChain{
-		Config:              config,
-		Client:              client,
-		ChainID:             chainID,
-		IServiceCoreSession: &iservice.IServiceCoreExSession{Contract: iServiceCore, CallOpts: *client.GetCallOpts(), TransactOpts: *client.GetTransactOpts()},
-		IServiceCoreABI:     iServiceCoreABI,
-		store:               store,
-		done:                true,
+	eth := &EthChain{
+		Config:               config,
+		Client:               client,
+		ChainID:              chainID,
+		IServiceCoreContract: iServiceCore,
+		IServiceCoreABI:      iServiceCoreABI,
+		store:                store,
 	}
 
-	err = fisco.storeChainParams()
+	err = eth.storeChainParams()
 	if err != nil {
 		return nil, err
 	}
 
-	err = fisco.storeChainID()
+	err = eth.storeChainID()
 	if err != nil {
 		return nil, err
 	}
 
-	return fisco, nil
+	return eth, nil
 }
 
-// BuildFISCOChain builds a FISCOChain instance from the given chain params and store
-func BuildFISCOChain(
+// BuildEthChain builds a EthChain instance from the given chain params and store
+func BuildEthChain(
 	chainParams []byte,
 	store *store.Store,
-) (*FISCOChain, error) {
+) (*EthChain, error) {
 	var params ChainParams
 	err := json.Unmarshal(chainParams, &params)
 	if err != nil {
@@ -116,72 +117,98 @@ func BuildFISCOChain(
 		ChainParams: params,
 	}
 
-	return NewFISCOChain(config, store)
+	return NewEthChain(config, store)
 }
 
 // GetChainID implements AppChainI
-func (f *FISCOChain) GetChainID() string {
-	return f.ChainID
+func (ec *EthChain) GetChainID() string {
+	return ec.ChainID
 }
 
 // Start implements AppChainI
-func (f *FISCOChain) Start(handler core.InterchainRequestHandler) error {
-	if !f.done {
-		return fmt.Errorf("chain %s has been started", f.ChainID)
+func (ec *EthChain) Start(handler core.InterchainRequestHandler) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	filterQuery := ethereum.FilterQuery{
+		Addresses: []ethcmn.Address{ethcmn.HexToAddress(ec.Config.IServiceCoreAddr)},
+		Topics:    [][]ethcmn.Hash{{crypto.Keccak256Hash([]byte(ec.Config.IServiceEventSig))}},
 	}
 
-	f.done = false
-	f.handler = handler
+	ch := make(chan ethtypes.Log)
 
-	go f.monitor()
+	sub, err := ec.Client.SubscribeFilterLogs(ctx, filterQuery, ch)
+	if err != nil {
+		return err
+	}
 
-	logging.Logger.Infof("chain %s started", f.ChainID)
+	ec.ClientSubscription = sub
+	ec.done = false
+
+	logHandler := func(log ethtypes.Log) {
+		iServiceRequestEvent, err := ec.parseLog(log)
+		if err != nil {
+			logging.Logger.Errorf("failed to parse log %+v: %s", log, err)
+		} else {
+			request := ec.buildInterchainRequest(&iServiceRequestEvent)
+			handler(ec.ChainID, request, log.TxHash.String())
+		}
+	}
+
+	go ec.logListener(sub, ch, logHandler)
 
 	return nil
 }
 
 // Stop implements AppChainI
-func (f *FISCOChain) Stop() error {
-	logging.Logger.Infof("stopping chain %s", f.ChainID)
-	f.done = true
+func (ec *EthChain) Stop() error {
+	logging.Logger.Infof("stopping chain %s", ec.ChainID)
+	if ec.ClientSubscription != nil{
+		ec.ClientSubscription.Unsubscribe()
+	}
+	ec.done = true
 
 	return nil
 }
 
-func (f *FISCOChain) Close(){
-	f.Client.Close()
+func (ec *EthChain) Close() {
+	ec.Client.Close()
 }
 
 // GetHeight implements AppChainI
-func (f *FISCOChain) GetHeight() int64 {
-	return f.lastHeight
+func (ec *EthChain) GetHeight() int64 {
+	height, _ := ec.Client.BlockNumber(context.Background())
+	return int64(height)
 }
 
 // SendResponse implements AppChainI
-func (f *FISCOChain) SendResponse(requestID string, response core.ResponseI) error {
+func (ec *EthChain) SendResponse(requestID string, response core.ResponseI) error {
+	auth, err := ec.buildAuthTransactor()
+	if err != nil {
+		return err
+	}
 	requestIDBytes, err := hex.DecodeString(requestID)
 	if err != nil {
 		return err
 	}
 
-	data :=&txstore.RelayerResInfo{
+	data := &txstore.RelayerResInfo{
 		RequestId: requestID,
-		TxStatus: txstore.TxStatus_Success,
-		ErrMsg: "",
+		TxStatus:  txstore.TxStatus_Success,
+		ErrMsg:    "",
 	}
 
 	defer func(d *txstore.RelayerResInfo) {
 		txstore.RelayerResponeRecord(d)
 	}(data)
 
-
 	var requestID32Bytes [32]byte
 	copy(requestID32Bytes[:], requestIDBytes)
 
-	tx, _, err := f.IServiceCoreSession.SetResponse(requestID32Bytes, response.GetErrMsg(), response.GetOutput())
+	tx, err := ec.IServiceCoreContract.SetResponse(auth, requestID32Bytes, response.GetErrMsg(), response.GetOutput())
 	if err != nil {
 		data.TxStatus = txstore.TxStatus_Error
-		data.ErrMsg = fmt.Sprintf("call fisco setResponse failed :%s",err)
+		data.ErrMsg = fmt.Sprintf("call eth setResponse failed :%s", err)
 
 		return err
 	}
@@ -191,11 +218,11 @@ func (f *FISCOChain) SendResponse(requestID string, response core.ResponseI) err
 	// TODO
 	//mysql.OnInterchainRequestResponseSent(requestID, tx.Hash().Hex())
 
-	err = f.waitForReceipt(tx, "SetResponse")
+	err = ec.waitForReceipt(tx, "SetResponse")
 	if err != nil {
 
 		data.TxStatus = txstore.TxStatus_Error
-		data.ErrMsg = fmt.Sprintf("call fisco setResponse failed :%s",err)
+		data.ErrMsg = fmt.Sprintf("call eth setResponse failed :%s", err)
 		return err
 	}
 
@@ -206,7 +233,7 @@ func (f *FISCOChain) SendResponse(requestID string, response core.ResponseI) err
 }
 
 // buildInterchainRequest builds an interchain request from the interchain event
-func (f *FISCOChain) buildInterchainRequest(e *iservice.IServiceCoreExCrossChainRequestSent) core.InterchainRequest {
+func (ec *EthChain) buildInterchainRequest(e *iservice.IServiceCoreExCrossChainRequestSent) core.InterchainRequest {
 	var endpointInfo EndpointInfo
 	err := json.Unmarshal([]byte(e.EndpointInfo), &endpointInfo)
 	if err != nil {
@@ -214,7 +241,7 @@ func (f *FISCOChain) buildInterchainRequest(e *iservice.IServiceCoreExCrossChain
 	}
 	return core.InterchainRequest{
 		ID:              hex.EncodeToString(e.RequestID[:]),
-		SourceChainID:   f.ChainID,
+		SourceChainID:   ec.ChainID,
 		DestChainID:     endpointInfo.DestChainID,
 		DestSubChainID:  endpointInfo.DestSubChainID,
 		DestChainType:   endpointInfo.DestChainType,
@@ -227,16 +254,16 @@ func (f *FISCOChain) buildInterchainRequest(e *iservice.IServiceCoreExCrossChain
 }
 
 // waitForReceipt waits for the receipt of the given tx
-func (f *FISCOChain) waitForReceipt(tx *types.Transaction, name string) error {
-	logging.Logger.Infof("%s: transaction sent to %s, hash: %s", name, f.GetChainID(), tx.Hash().Hex())
+func (ec *EthChain) waitForReceipt(tx *ethtypes.Transaction, name string) error {
+	logging.Logger.Infof("%s: transaction sent to %s, hash: %s", name, ec.GetChainID(), tx.Hash().Hex())
 
-	receipt, err := f.Client.WaitMined(tx)
+	receipt, err := bind.WaitMined(context.Background(), ec.Client, tx)
 	if err != nil {
 		return fmt.Errorf("failed to mint the transaction %s: %s", tx.Hash().Hex(), err)
 	}
 
-	if receipt.Status != types.Success {
-		return fmt.Errorf("transaction %s execution failed: %s", tx.Hash().Hex(), receipt.GetErrorMessage())
+	if receipt.Status == ethtypes.ReceiptStatusFailed {
+		return fmt.Errorf("%s: transaction %s execution failed", name, tx.Hash().Hex())
 	}
 
 	logging.Logger.Infof("%s: transaction %s execution succeeded", name, tx.Hash().Hex())
@@ -244,139 +271,58 @@ func (f *FISCOChain) waitForReceipt(tx *types.Transaction, name string) error {
 	return nil
 }
 
-// monitor is responsible for monitoring the chain
-func (f *FISCOChain) monitor() {
-	for {
-		f.scan()
-
-		if f.done {
-			return
-		}
-
-		time.Sleep(time.Duration(f.Config.MonitorInterval) * time.Second)
-	}
-}
-
-// scan performs chain scanning
-func (f *FISCOChain) scan() {
-	currentHeight, err := f.getBlockNumber()
-	if err != nil {
-		logging.Logger.Errorf("failed to get the current block height: %s", err)
-		return
-	}
-
-	if f.lastHeight == 0 {
-		f.lastHeight = currentHeight - 1
-	}
-
-	if currentHeight <= f.lastHeight {
-		return
-	}
-
-	f.scanBlocks(f.lastHeight+1, currentHeight)
-}
-
-// scanBlocks scans the blocks of the specified range
-func (f *FISCOChain) scanBlocks(startHeight int64, endHeight int64) {
-	for h := startHeight; h <= endHeight; {
-		block, err := f.getBlock(h)
-		if err != nil {
-			logging.Logger.Errorf(err.Error())
-			continue
-		}
-
-		f.parseInterchainEventsFromBlock(block)
-
-		err = f.updateHeight(h)
-		if err != nil {
-			logging.Logger.Errorf("failed to update height: %s", err)
-		}
-
-		h++
-	}
-}
-
 // getBlockNumber retrieves the current block number
-func (f *FISCOChain) getBlockNumber() (int64, error) {
-	blockNumber, err := f.Client.GetBlockNumber(context.Background())
+func (ec *EthChain) getBlockNumber() (int64, error) {
+	blockNumber, err := ec.Client.BlockNumber(context.Background())
 	if err != nil {
 		return -1, err
 	}
-
-	blockNumberStr := string(blockNumber)
-
-	return common.Hex2Decimal(blockNumberStr[3 : len(blockNumberStr)-1])
+	return int64(blockNumber), nil
 }
 
 // getBlock gets the block in the given height
-func (f *FISCOChain) getBlock(height int64) (block CompactBlock, err error) {
-	blockBz, err := f.Client.GetBlockByNumber(context.Background(), fmt.Sprintf("0x%x", height), false)
-	if err != nil {
-		return block, fmt.Errorf("failed to retrieve the block, height: %d, err: %s", height, err)
-	}
-
-	err = json.Unmarshal(blockBz, &block)
-	if err != nil {
-		return block, fmt.Errorf("failed to unmarshal the block, height: %d, err: %s", height, err)
-	}
-
-	return
+func (ec *EthChain) getBlock(height int64) (block *ethtypes.Block, err error) {
+	return ec.Client.BlockByNumber(context.Background(), big.NewInt(height))
 }
 
-// parseInterchainEventsFromBlock parses the interchain events from the block
-func (f *FISCOChain) parseInterchainEventsFromBlock(block CompactBlock) {
-	for _, txHash := range block.Txs {
-		receipt, err := f.Client.GetTransactionReceipt(context.Background(), txHash)
-		if err != nil {
-			logging.Logger.Errorf("failed to get the receipt, tx: %s, err: %s", txHash, err)
-			continue
+// logListener listens to the log sent by the given channel and handles it with the specified handler
+func (ec EthChain) logListener(sub ethereum.Subscription, logChan chan ethtypes.Log, handler func(log ethtypes.Log)) {
+	for {
+		select {
+		case log := <-logChan:
+			handler(log)
+		case err := <-sub.Err():
+			logging.Logger.Errorf("Error on log subscription: %s", err)
 		}
-
-		if receipt.Status != types.Success {
-			continue
+		if ec.done {
+			return
 		}
-
-		f.parseCrossChaiRequestSentEvents(receipt)
+		time.Sleep(time.Duration(ec.Config.MonitorInterval) * time.Second)
 	}
 }
 
 // parseServiceInvokedEvents parses the ServiceInvoked events from the receipt
-func (f *FISCOChain) parseCrossChaiRequestSentEvents(receipt *types.Receipt) {
-	for _, log := range receipt.Logs {
-		if !strings.EqualFold(log.Address, f.Config.IServiceCoreAddr) {
-			continue
-		}
-
-		data, err := hex.DecodeString(log.Data[2:])
-		if err != nil {
-			logging.Logger.Errorf("failed to decode the log data: %s", err)
-			continue
-		}
-
-		var event iservice.IServiceCoreExCrossChainRequestSent
-		err = f.IServiceCoreABI.Unpack(&event, "CrossChainRequestSent", data)
-		if err != nil {
-			logging.Logger.Errorf("failed to unpack the log data: %s", err)
-			continue
-		}
-
-		request := f.buildInterchainRequest(&event)
-		_ = f.handler(f.ChainID, request, receipt.TransactionHash)
+func (ec *EthChain) parseLog(log ethtypes.Log) (iservice.IServiceCoreExCrossChainRequestSent, error) {
+	var event iservice.IServiceCoreExCrossChainRequestSent
+	err := ec.IServiceCoreABI.UnpackIntoInterface(&event, ec.Config.IServiceEventName, log.Data)
+	if err != nil {
+		return event, err
 	}
+	return event, nil
 }
 
 // storeChainParams stores the chain params
-func (f *FISCOChain) storeChainParams() error {
-	bz, err := json.Marshal(f.Config.ChainParams)
+func (ec *EthChain) storeChainParams() error {
+	bz, err := json.Marshal(ec.Config.ChainParams)
 	if err != nil {
 		return err
 	}
 
-	return f.store.Set(ChainParamsKey(f.ChainID), bz)
+	return ec.store.Set(ChainParamsKey(ec.ChainID), bz)
 }
 
-func (f *FISCOChain) storeChainID() error {
-	chainIDsbz, err := f.store.Get([]byte("chainIDs"))
+func (ec *EthChain) storeChainID() error {
+	chainIDsbz, err := ec.store.Get([]byte("chainIDs"))
 	if err != nil {
 		return err
 	}
@@ -385,13 +331,28 @@ func (f *FISCOChain) storeChainID() error {
 	if err != nil {
 		return err
 	}
-	chainIDs[f.ChainID] = "fisco"
+	chainIDs[ec.ChainID] = "eth"
 	bz, _ := json.Marshal(chainIDs)
-	return f.store.Set([]byte("chainIDs"), bz)
+	return ec.store.Set([]byte("chainIDs"), bz)
 }
 
-// updateHeight updates the height
-func (f *FISCOChain) updateHeight(height int64) error {
-	f.lastHeight = height
-	return f.store.SetInt64(HeightKey(f.ChainID), height)
+// buildAuthTransactor builds an authenticated transactor
+func (ec *EthChain) buildAuthTransactor() (*bind.TransactOpts, error) {
+	privKey, err := crypto.HexToECDSA(ec.Config.Key)
+	if err != nil {
+		return nil, err
+	}
+
+	auth, err := bind.NewKeyedTransactorWithChainID(privKey, new(big.Int))
+
+	nextNonce, err := ec.Client.PendingNonceAt(context.Background(), auth.From)
+	if err != nil {
+		return nil, err
+	}
+
+	auth.GasLimit = ec.Config.GasLimit
+	auth.GasPrice = big.NewInt(int64(ec.Config.GasPrice))
+	auth.Nonce = big.NewInt(int64(nextNonce))
+
+	return auth, nil
 }

@@ -1,5 +1,5 @@
 base:
-    app_chain_type: fisco # application chain type
+    app_chain_type: eth # application chain type
     store_path: .db # store path
     http_port: 8082
 
@@ -15,15 +15,15 @@ hub:
 # ethereum config
 eth:
     chain_id: ropsten
-    node_rpc_addr: wss://ropsten.infura.io/ws/v3/56e89587eacb4fbe8655e4c44b146237
     gas_limit: 2000000
     gas_price: 5000000000
     key: 5dee232c8be5cb81f0ae6fddb45243fc6208192c16aef275ef41b019df765d1f
     passphrase: 123456789
-    iservice_core_addr: 0x79b6c1ab5dbeba4879bfbea35a78fac8e6c73c92
-    iservice_market_addr: 0x87e71e95fbd95d66e307edaeb7974c1f17f87a82
-    iservice_event_name: ServiceInvoked
-    iservice_event_sig: ServiceInvoked(bytes32,string,string,uint256)
+    iservice_event_name: CrossChainRequestSent
+    iservice_event_sig: CrossChainRequestSent(bytes32,string,string,bytes,address)
+    monitor_interval: 1 # chain monitoring interval in seconds
+    nodes:
+        eth1.bsnbase.com: wss://ropsten.infura.io/ws/v3/56e89587eacb4fbe8655e4c44b146237
 
 # mysql config
 mysql:

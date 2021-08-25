@@ -3,11 +3,10 @@ module relayer
 go 1.14
 
 require (
-	github.com/FISCO-BCOS/go-sdk v0.10.0
 	github.com/cockroachdb/pebble v0.0.0-20201118202804-75ede898b66c
-	github.com/ethereum/go-ethereum v1.9.18
+	github.com/ethereum/go-ethereum v1.10.8-0.20210820121421-c368f728c19e
 	github.com/gin-gonic/gin v1.4.0
-	github.com/go-sql-driver/mysql v1.4.0
+	github.com/go-sql-driver/mysql v1.4.1
 	github.com/irisnet/service-sdk-go v1.0.1-0.20210416090657-1bdf41efe743
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/sirupsen/logrus v1.6.0

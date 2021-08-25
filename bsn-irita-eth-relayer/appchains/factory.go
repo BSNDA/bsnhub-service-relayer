@@ -1,16 +1,16 @@
 package appchains
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
-	"encoding/json"
 
 	"github.com/spf13/viper"
 
-	"relayer/appchains/fisco"
+	"relayer/appchains/eth"
+	"relayer/config"
 	// "relayer/appchains/ethereum"
 	"relayer/core"
-	"relayer/config"
 	"relayer/store"
 )
 
@@ -42,13 +42,13 @@ func NewBaseConfigFactory(v *viper.Viper) *BaseConfigFactory {
 func (f *AppChainFactory) BuildAppChain(chainType string, chainParams []byte) (core.AppChainI, error) {
 	switch strings.ToLower(chainType) {
 	case "eth":
-		return nil, nil
+		return eth.BuildEthChain(chainParams, f.Store)
 
 	case "fabric":
 		return nil, nil
 
 	case "fisco":
-		return eth.BuildFISCOChain(chainParams, f.Store)
+		return nil, nil
 
 	default:
 		return nil, fmt.Errorf("application chain %s not supported", chainType)
@@ -59,13 +59,13 @@ func (f *AppChainFactory) BuildAppChain(chainType string, chainParams []byte) (c
 func (f *AppChainFactory) GetChainID(chainType string, chainParams []byte) (chainID string, err error) {
 	switch strings.ToLower(chainType) {
 	case "eth":
-		return "", nil
+		return eth.GetChainIDFromBytes(chainParams)
 
 	case "fabric":
 		return "", nil
 
 	case "fisco":
-		return eth.GetChainIDFromBytes(chainParams)
+		return "", nil
 
 	default:
 		return "", fmt.Errorf("application chain %s not supported", chainType)
@@ -76,13 +76,13 @@ func (f *AppChainFactory) GetChainID(chainType string, chainParams []byte) (chai
 func (f *AppChainFactory) StoreBaseConfig(chainType string, baseConfig []byte) error {
 	switch strings.ToLower(chainType) {
 	case "eth":
-		return nil
+		return eth.StoreBaseConfig(f.Store, baseConfig)
 
 	case "fabric":
 		return nil
 
 	case "fisco":
-		return eth.StoreBaseConfig(f.Store, baseConfig)
+		return nil
 
 	default:
 		return fmt.Errorf("application chain %s not supported", chainType)
@@ -93,12 +93,6 @@ func (f *AppChainFactory) StoreBaseConfig(chainType string, baseConfig []byte) e
 func (f *AppChainFactory) DeleteChainConfig(chainType string, chainID string) error {
 	switch strings.ToLower(chainType) {
 	case "eth":
-		return nil
-
-	case "fabric":
-		return nil
-
-	case "fisco":
 		err := f.Store.Delete(eth.ChainParamsKey(chainID))
 		if err != nil{
 			return err
@@ -108,11 +102,18 @@ func (f *AppChainFactory) DeleteChainConfig(chainType string, chainID string) er
 		json.Unmarshal(chainIDsbz, &chainIDs)
 		delete(chainIDs, chainID)
 		bz, err := json.Marshal(chainIDs)
-	    err = f.Store.Set([]byte("chainIDs"), bz)
+		err = f.Store.Set([]byte("chainIDs"), bz)
 		if err != nil{
 			return err
 		}
 		return f.Store.Delete(eth.ChainParamsKey(chainID))
+		return nil
+
+	case "fabric":
+		return nil
+
+	case "fisco":
+		return nil
 	default:
 		return fmt.Errorf("application chain %s not supported", chainType)
 	}
@@ -122,13 +123,13 @@ func (f *AppChainFactory) DeleteChainConfig(chainType string, chainID string) er
 func (bc *BaseConfigFactory) NewBaseConfig(chainType string) (config.BaseConfigI, error) {
 	switch strings.ToLower(chainType) {
 	case "eth":
-		return nil, nil
+		return eth.NewBaseConfig(bc.config), nil
 
 	case "fabric":
 		return nil, nil
 
 	case "fisco":
-		return eth.NewBaseConfig(bc.config)
+		return nil, nil
 
 	default:
 		return nil, fmt.Errorf("application chain %s not supported", chainType)
