@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: SimPL-2.0
-pragma solidity ^0.8.7;
+pragma solidity ^0.6.0;
 
 /**
  * @title iService interface

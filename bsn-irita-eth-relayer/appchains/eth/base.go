@@ -2,7 +2,6 @@ package eth
 
 import (
 	"encoding/json"
-	"strconv"
 )
 
 const (
@@ -18,7 +17,7 @@ type CompactBlock struct {
 // ChainParams defines the params for the specific chain
 type ChainParams struct {
 	NodeURLs         []string `json:"nodes"`
-	ChainID          int64    `json:"chainId"`
+	ChainID          string    `json:"chainId"`
 	IServiceCoreAddr string   `json:"iserviceCoreAddr"`
 }
 
@@ -32,7 +31,7 @@ type EndpointInfo struct {
 
 // GetChainID returns the unique chain id from the specified chain params
 func GetChainID(params ChainParams) string {
-	return strconv.FormatInt(params.ChainID, 10)
+	return  params.ChainID
 }
 
 // GetChainIDFromBytes returns the unique chain id from the given chain params bytes

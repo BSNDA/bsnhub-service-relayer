@@ -56,7 +56,7 @@ func NewEthChain(
 		return nil, fmt.Errorf("failed to connect to eth node: %s", err)
 	}
 
-	iServiceCoreABI, err := abi.JSON(strings.NewReader(iservice.IServiceCoreExMetaData.ABI))
+	iServiceCoreABI, err := abi.JSON(strings.NewReader(iservice.IServiceCoreExABI))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse iService Core Extension ABI: %s", err)
 	}
@@ -177,8 +177,7 @@ func (ec *EthChain) Close() {
 
 // GetHeight implements AppChainI
 func (ec *EthChain) GetHeight() int64 {
-	height, _ := ec.Client.BlockNumber(context.Background())
-	return int64(height)
+	return int64(1)
 }
 
 // SendResponse implements AppChainI
@@ -271,15 +270,6 @@ func (ec *EthChain) waitForReceipt(tx *ethtypes.Transaction, name string) error 
 	return nil
 }
 
-// getBlockNumber retrieves the current block number
-func (ec *EthChain) getBlockNumber() (int64, error) {
-	blockNumber, err := ec.Client.BlockNumber(context.Background())
-	if err != nil {
-		return -1, err
-	}
-	return int64(blockNumber), nil
-}
-
 // getBlock gets the block in the given height
 func (ec *EthChain) getBlock(height int64) (block *ethtypes.Block, err error) {
 	return ec.Client.BlockByNumber(context.Background(), big.NewInt(height))
@@ -304,7 +294,7 @@ func (ec EthChain) logListener(sub ethereum.Subscription, logChan chan ethtypes.
 // parseServiceInvokedEvents parses the ServiceInvoked events from the receipt
 func (ec *EthChain) parseLog(log ethtypes.Log) (iservice.IServiceCoreExCrossChainRequestSent, error) {
 	var event iservice.IServiceCoreExCrossChainRequestSent
-	err := ec.IServiceCoreABI.UnpackIntoInterface(&event, ec.Config.IServiceEventName, log.Data)
+	err := ec.IServiceCoreABI.Unpack(&event, ec.Config.IServiceEventName, log.Data)
 	if err != nil {
 		return event, err
 	}
@@ -343,7 +333,7 @@ func (ec *EthChain) buildAuthTransactor() (*bind.TransactOpts, error) {
 		return nil, err
 	}
 
-	auth, err := bind.NewKeyedTransactorWithChainID(privKey, new(big.Int))
+	auth := bind.NewKeyedTransactor(privKey)
 
 	nextNonce, err := ec.Client.PendingNonceAt(context.Background(), auth.From)
 	if err != nil {

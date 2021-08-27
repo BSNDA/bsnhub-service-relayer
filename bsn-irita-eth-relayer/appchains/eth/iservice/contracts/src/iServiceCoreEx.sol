@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: SimPL-2.0
-pragma solidity ^0.8.7;
+pragma solidity ^0.6.0;
 
 import "./vendor/Ownable.sol";
 import "./interfaces/iServiceInterface.sol";
@@ -47,7 +47,7 @@ contract iServiceCoreEx is iServiceInterface, Ownable {
      * @dev Constructor
      * @param _relayer Relayer address
      */
-    constructor(address _relayer, string memory _sourceChainID) Ownable() {
+    constructor(address _relayer, string memory _sourceChainID) public Ownable() {
         sourceChainID = _sourceChainID;
         if (_relayer != address(0)) {
             relayer = _relayer;

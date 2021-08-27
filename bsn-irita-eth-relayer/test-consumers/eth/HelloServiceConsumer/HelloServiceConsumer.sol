@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: SimPL-2.0
-pragma solidity ^0.8.7;
+pragma solidity ^0.6.0;
 
 /**
  * @title iService interface
@@ -140,7 +140,7 @@ contract iServiceClient {
  * The service is supported by price service
  */
 contract ServiceConsumer is iServiceClient {
-    string private endpointInfo = "{\"dest_chain_id\":\"1\",\"dest_sub_chain_id\":\"1\",\"dest_chain_type\":\"eth\",\"endpoint_address\":\"0x9e629d97854a80c3e4c3971acaa46edd43f81a52\",\"endpoint_type\":\"contract\"}";
+    string private endpointInfo = "{\"dest_chain_id\":\"ropsten\",\"dest_chain_type\":\"eth\",\"endpoint_address\":\"0xd41b3Afa1B4114542Eb46cDd55EcF2FffAA24504\",\"endpoint_type\":\"contract\"}";
     event Hello(bytes32 _requestID, string _helloMsg);
     string public result;
     /*
@@ -150,7 +150,7 @@ contract ServiceConsumer is iServiceClient {
      */
     constructor(
         address _iServiceCore
-    )
+    ) public
     {
         setIServiceCore(_iServiceCore);
     }
