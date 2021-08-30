@@ -16,7 +16,6 @@ import (
 
 	"relayer/appchains/fisco/iservice"
 	txstore "relayer/appchains/fisco/store"
-	"relayer/common"
 	"relayer/core"
 	"relayer/logging"
 	"relayer/store"
@@ -164,16 +163,15 @@ func (f *FISCOChain) SendResponse(requestID string, response core.ResponseI) err
 		return err
 	}
 
-	data :=&txstore.RelayerResInfo{
+	data := &txstore.RelayerResInfo{
 		RequestId: requestID,
-		TxStatus: txstore.TxStatus_Success,
-		ErrMsg: "",
+		TxStatus:  txstore.TxStatus_Success,
+		ErrMsg:    "",
 	}
 
 	defer func(d *txstore.RelayerResInfo) {
 		txstore.RelayerResponeRecord(d)
 	}(data)
-
 
 	var requestID32Bytes [32]byte
 	copy(requestID32Bytes[:], requestIDBytes)
@@ -181,7 +179,7 @@ func (f *FISCOChain) SendResponse(requestID string, response core.ResponseI) err
 	tx, _, err := f.IServiceCoreSession.SetResponse(requestID32Bytes, response.GetErrMsg(), response.GetOutput())
 	if err != nil {
 		data.TxStatus = txstore.TxStatus_Error
-		data.ErrMsg = fmt.Sprintf("call fisco setResponse failed :%s",err)
+		data.ErrMsg = fmt.Sprintf("call fisco setResponse failed :%s", err)
 
 		return err
 	}
@@ -195,7 +193,7 @@ func (f *FISCOChain) SendResponse(requestID string, response core.ResponseI) err
 	if err != nil {
 
 		data.TxStatus = txstore.TxStatus_Error
-		data.ErrMsg = fmt.Sprintf("call fisco setResponse failed :%s",err)
+		data.ErrMsg = fmt.Sprintf("call fisco setResponse failed :%s", err)
 		return err
 	}
 
@@ -279,6 +277,7 @@ func (f *FISCOChain) scan() {
 // scanBlocks scans the blocks of the specified range
 func (f *FISCOChain) scanBlocks(startHeight int64, endHeight int64) {
 	for h := startHeight; h <= endHeight; {
+		logging.Logger.Infof("scanBlock Height is %d", h)
 		block, err := f.getBlock(h)
 		if err != nil {
 			logging.Logger.Errorf(err.Error())
@@ -299,18 +298,20 @@ func (f *FISCOChain) scanBlocks(startHeight int64, endHeight int64) {
 // getBlockNumber retrieves the current block number
 func (f *FISCOChain) getBlockNumber() (int64, error) {
 	blockNumber, err := f.Client.GetBlockNumber(context.Background())
-	if err != nil {
-		return -1, err
-	}
 
-	blockNumberStr := string(blockNumber)
-
-	return common.Hex2Decimal(blockNumberStr[3 : len(blockNumberStr)-1])
+	return blockNumber, err
+	//if err != nil {
+	//	return -1, err
+	//}
+	//
+	//blockNumberStr := string(blockNumber)
+	//
+	//return common.Hex2Decimal(blockNumberStr[3 : len(blockNumberStr)-1])
 }
 
 // getBlock gets the block in the given height
 func (f *FISCOChain) getBlock(height int64) (block CompactBlock, err error) {
-	blockBz, err := f.Client.GetBlockByNumber(context.Background(), fmt.Sprintf("0x%x", height), false)
+	blockBz, err := f.Client.GetBlockByNumber(context.Background(), height, false)
 	if err != nil {
 		return block, fmt.Errorf("failed to retrieve the block, height: %d, err: %s", height, err)
 	}
@@ -326,7 +327,7 @@ func (f *FISCOChain) getBlock(height int64) (block CompactBlock, err error) {
 // parseInterchainEventsFromBlock parses the interchain events from the block
 func (f *FISCOChain) parseInterchainEventsFromBlock(block CompactBlock) {
 	for _, txHash := range block.Txs {
-		receipt, err := f.Client.GetTransactionReceipt(context.Background(), txHash)
+		receipt, err := f.Client.GetTransactionReceipt(context.Background(), ethcmn.HexToHash(txHash))
 		if err != nil {
 			logging.Logger.Errorf("failed to get the receipt, tx: %s, err: %s", txHash, err)
 			continue

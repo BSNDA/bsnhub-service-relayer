@@ -3,7 +3,7 @@ module relayer
 go 1.14
 
 require (
-	github.com/FISCO-BCOS/go-sdk v0.10.0
+	github.com/FISCO-BCOS/go-sdk v0.11.0
 	github.com/cockroachdb/pebble v0.0.0-20201118202804-75ede898b66c
 	github.com/ethereum/go-ethereum v1.9.18
 	github.com/gin-gonic/gin v1.4.0
