@@ -60,6 +60,7 @@ func NewOpbChain(
 		sdktypes.CachedOption(true),
 		sdktypes.KeyDAOOption(sdkstore.NewFileDAO(config.KeyPath)),
 		sdktypes.FeeOption(fees),
+		sdktypes.GasOption(config.DefaultGas),
 		sdktypes.TimeoutOption(config.Timeout),
 	}
 

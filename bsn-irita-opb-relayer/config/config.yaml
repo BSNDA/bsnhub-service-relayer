@@ -23,6 +23,7 @@ opb:
     key_name: node1
     passphrase: 1234567890
     default_fee: 2000000uirita
+    default_gas: 500000
     monitor_interval: 1 # chain monitoring interval in seconds
     timeout: 20
 

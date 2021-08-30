@@ -85,8 +85,6 @@ func NewFISCOChain(
 		return nil, err
 	}
 
-	store.GetInt64(HeightKey(chainID))
-
 	return fisco, nil
 }
 
@@ -147,6 +145,10 @@ func (f *FISCOChain) Stop() error {
 	f.done = true
 
 	return nil
+}
+
+func (f *FISCOChain) Close(){
+	f.Client.Close()
 }
 
 // GetHeight implements AppChainI
@@ -360,7 +362,7 @@ func (f *FISCOChain) parseCrossChaiRequestSentEvents(receipt *types.Receipt) {
 		}
 
 		request := f.buildInterchainRequest(&event)
-		f.handler(f.ChainID, request, receipt.TransactionHash)
+		_ = f.handler(f.ChainID, request, receipt.TransactionHash)
 	}
 }
 
@@ -385,7 +387,7 @@ func (f *FISCOChain) storeChainID() error {
 		return err
 	}
 	chainIDs[f.ChainID] = "fisco"
-	bz, err := json.Marshal(chainIDs)
+	bz, _ := json.Marshal(chainIDs)
 	return f.store.Set([]byte("chainIDs"), bz)
 }
 
