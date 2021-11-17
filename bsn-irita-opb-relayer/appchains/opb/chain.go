@@ -6,14 +6,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	sdk "github.com/bianjieai/irita-sdk-go"
-	"github.com/bianjieai/irita-sdk-go/modules/wasm"
-	"github.com/bianjieai/irita-sdk-go/types"
-	sdktypes "github.com/bianjieai/irita-sdk-go/types"
-	sdkstore "github.com/bianjieai/irita-sdk-go/types/store"
+	"github.com/bianjieai/iritamod-sdk-go/wasm"
+	"github.com/irisnet/core-sdk-go/types"
+	sdktypes "github.com/irisnet/core-sdk-go/types"
+	sdkstore "github.com/irisnet/core-sdk-go/types/store"
+	log "github.com/sirupsen/logrus"
 	abci "github.com/tendermint/tendermint/abci/types"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	txstore "relayer/appchains/opb/store"
+	"relayer/hub"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ import (
 // opbChain defines the opb chain
 type OpbChain struct {
 	Config    Config
-	OpbClient sdk.IRITAClient
+	OpbClient *hub.ServiceClient
 	ChainID   string // unique chain ID
 
 	store      *store.Store // store backend instance
@@ -46,29 +47,35 @@ func NewOpbChain(
 	var rpcAddr string
 	var grpcAddr string
 	//获取配置的nodeURL
-	rpcAddrstr, ok := config.RpcAddrsMap[nodeName]
+	rpcAddrStr, ok := config.RpcAddrsMap[nodeName]
 	if ok {
-		rpcAddr = rpcAddrstr
+		rpcAddr = rpcAddrStr
 	}
-	grpcAddrstr, ok := config.GrpcAddrsMap[nodeName]
+	grpcAddrStr, ok := config.GrpcAddrsMap[nodeName]
 	if ok {
-		grpcAddr = grpcAddrstr
+		grpcAddr = grpcAddrStr
 	}
 	fees, _ := sdktypes.ParseDecCoins(config.DefaultFee)
 
 	options := []sdktypes.Option{
 		sdktypes.CachedOption(true),
-		sdktypes.KeyDAOOption(sdkstore.NewFileDAO(config.KeyPath)),
+		sdktypes.KeyDAOOption(sdkstore.NewMemory(nil)),
 		sdktypes.FeeOption(fees),
 		sdktypes.GasOption(config.DefaultGas),
 		sdktypes.TimeoutOption(config.Timeout),
+		sdktypes.AlgoOption(defaultAlgo),
 	}
 
-	clientConfig, err := sdktypes.NewClientConfig(rpcAddr, grpcAddr, config.BaseConfig.ChainId, options...)
+	clientConfig, err := sdktypes.NewClientConfig(
+		rpcAddr,
+		grpcAddr,
+		config.BaseConfig.ChainId,
+		options...,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init clientConfig: %s", err)
 	}
-	opbClient := sdk.NewIRITAClient(clientConfig)
+	opbClient := hub.NewServiceClient(clientConfig)
 	chainID := GetChainID(config.ChainParams)
 
 	opb := &OpbChain{
@@ -78,6 +85,13 @@ func NewOpbChain(
 		store:     store,
 		done:      true,
 	}
+
+	// import opb key
+	addr, err := opb.OpbClient.Import(config.Account.KeyName, config.Account.Passphrase, config.Account.KeyArmor)
+	if err != nil {
+		return nil, err
+	}
+	log.WithFields(log.Fields{"addr": addr}).Info("import opb account success")
 
 	err = opb.storeChainParams()
 	if err != nil {
@@ -89,7 +103,12 @@ func NewOpbChain(
 		return nil, err
 	}
 
-	store.GetInt64(HeightKey(chainID))
+	//chainHeight, err := store.GetInt64(HeightKey(chainID))
+	//if err != nil {
+	//	log.WithFields(log.Fields{"err_info": err.Error(), "chain_id": chainID}).Error("get chain height err when opb chain client is initializing")
+	//	return nil, err
+	//}
+	//log.WithFields(log.Fields{"chain_height": chainHeight, "chain_id": chainID}).Info("finish initializing opb chain client")
 
 	return opb, nil
 }
@@ -146,16 +165,16 @@ func (opb *OpbChain) Start(handler core.InterchainRequestHandler) error {
 }
 
 // Stop implements AppChainI
-func (f *OpbChain) Stop() error {
-	logging.Logger.Infof("stopping chain %s", f.ChainID)
-	f.done = true
+func (opb *OpbChain) Stop() error {
+	logging.Logger.Infof("stopping chain %s", opb.ChainID)
+	opb.done = true
 
 	return nil
 }
 
 // GetHeight implements AppChainI
-func (f *OpbChain) GetHeight() int64 {
-	return f.lastHeight
+func (opb *OpbChain) GetHeight() int64 {
+	return opb.lastHeight
 }
 
 // SendResponse implements AppChainI
@@ -183,11 +202,11 @@ func (opb *OpbChain) SendResponse(requestID string, response core.ResponseI) err
 		//mysql.TxErrCollection(requestID, err.Error())
 		return err
 	}
-	data.FromResTxId = resultTx.Hash
+	data.FromResTxId = resultTx.Hash.String()
 	// TODO
 	//mysql.OnInterchainRequestResponseSent(requestID, resultTx.Hash)
 
-	err = opb.waitForSuccess(resultTx.Hash, "SetResponse")
+	err = opb.waitForSuccess(resultTx.Hash.String(), "SetResponse")
 	if err != nil {
 		//mysql.TxErrCollection(requestID, err.Error())
 		data.TxStatus = txstore.TxStatus_Error
@@ -206,8 +225,8 @@ func (opb *OpbChain) waitForSuccess(txHash string, name string) error {
 	logging.Logger.Infof("%s: transaction sent to %s, hash: %s", name, opb.GetChainID(), txHash)
 
 	tx, _ := opb.OpbClient.QueryTx(txHash)
-	if tx.Result.Code != 0 {
-		return fmt.Errorf("transaction %s execution failed: %s", txHash, tx.Result.Log)
+	if tx.TxResult.Code != 0 {
+		return fmt.Errorf("transaction %s execution failed: %s", txHash, tx.TxResult.Log)
 	}
 
 	logging.Logger.Infof("%s: transaction %s execution succeeded", name, txHash)
@@ -218,8 +237,8 @@ func (opb *OpbChain) waitForSuccess(txHash string, name string) error {
 // BuildBaseTx builds a base tx
 func (opb *OpbChain) BuildBaseTx() types.BaseTx {
 	return types.BaseTx{
-		From:     opb.Config.KeyName,
-		Password: opb.Config.Passphrase,
+		From:     opb.Config.Account.KeyName,
+		Password: opb.Config.Account.Passphrase,
 		Mode:     sdktypes.Commit,
 	}
 }
@@ -264,7 +283,7 @@ func (opb *OpbChain) buildInterchainRequest(e abci.Event) core.InterchainRequest
 
 //convCallData 按照hex base64 string的顺序解析字符串
 func convCallData(data string) []byte {
-	logging.Logger.Infof("Convert CallData : %s",data)
+	logging.Logger.Infof("Convert CallData : %s", data)
 	bytes, err := base64.StdEncoding.DecodeString(data)
 	if err == nil {
 		return bytes
@@ -347,10 +366,13 @@ func (opb *OpbChain) parseCrossChainRequest(txResults []*abci.ResponseDeliverTx,
 	for i, txResult := range txResults {
 		for _, e := range txResult.Events {
 			if e.Type == "wasm" && len(e.Attributes) > 1 {
-				contractAddr, _ := opb.getAttributeValue(e, "contract_address")
+				contractAddr, _ := opb.getAttributeValue(e, "_contract_address")
 				if contractAddr == opb.Config.ChainParams.IServiceCoreAddr {
 					request := opb.buildInterchainRequest(e)
-					opb.handler(opb.ChainID, request, strings.ToUpper(hex.EncodeToString(block.Block.Txs[i].Hash())))
+					err := opb.handler(opb.ChainID, request, strings.ToUpper(hex.EncodeToString(block.Block.Txs[i].Hash())))
+					if err != nil {
+
+					}
 				}
 			}
 		}
@@ -368,17 +390,17 @@ func (opb *OpbChain) getAttributeValue(event abci.Event, attributeKey string) (s
 }
 
 // storeChainParams stores the chain params
-func (f *OpbChain) storeChainParams() error {
-	bz, err := json.Marshal(f.Config.ChainParams)
+func (opb *OpbChain) storeChainParams() error {
+	bz, err := json.Marshal(opb.Config.ChainParams)
 	if err != nil {
 		return err
 	}
 
-	return f.store.Set(ChainParamsKey(f.ChainID), bz)
+	return opb.store.Set(ChainParamsKey(opb.ChainID), bz)
 }
 
-func (f *OpbChain) storeChainID() error {
-	chainIDsbz, err := f.store.Get([]byte("chainIDs"))
+func (opb *OpbChain) storeChainID() error {
+	chainIDsbz, err := opb.store.Get([]byte("chainIDs"))
 	if err != nil {
 		return err
 	}
@@ -387,13 +409,13 @@ func (f *OpbChain) storeChainID() error {
 	if err != nil {
 		return err
 	}
-	chainIDs[f.ChainID] = "opb"
+	chainIDs[opb.ChainID] = "opb"
 	bz, err := json.Marshal(chainIDs)
-	return f.store.Set([]byte("chainIDs"), bz)
+	return opb.store.Set([]byte("chainIDs"), bz)
 }
 
 // updateHeight updates the height
-func (f *OpbChain) updateHeight(height int64) error {
-	f.lastHeight = height
-	return f.store.SetInt64(HeightKey(f.ChainID), height)
+func (opb *OpbChain) updateHeight(height int64) error {
+	opb.lastHeight = height
+	return opb.store.SetInt64(HeightKey(opb.ChainID), height)
 }

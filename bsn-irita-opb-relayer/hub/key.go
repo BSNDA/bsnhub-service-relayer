@@ -28,5 +28,5 @@ func (ic IritaHubChain) ExportKey(name string, passphrase string) (keyArmor stri
 
 // RecoverKey implements KeyManager
 func (ic IritaHubChain) RecoverKey(name string, passphrase string, mnemonic string) (addr string, err error) {
-	return ic.IritaClient.Recover(name, passphrase, mnemonic)
+	return ic.IritaClient.Recover(name, passphrase, mnemonic, "")
 }

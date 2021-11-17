@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	servicesdk "github.com/bianjieai/irita-sdk-go"
-	"github.com/bianjieai/irita-sdk-go/modules/service"
-	"github.com/bianjieai/irita-sdk-go/types"
-	"github.com/bianjieai/irita-sdk-go/types/store"
+	"github.com/bianjieai/iritamod-sdk-go/service"
+	"github.com/irisnet/core-sdk-go/types"
+	sdk "github.com/irisnet/core-sdk-go/types"
+	storetypes "github.com/irisnet/core-sdk-go/types/store"
+	log "github.com/sirupsen/logrus"
 	"relayer/common"
 	"relayer/core"
 	"relayer/logging"
@@ -27,12 +28,11 @@ type IritaHubChain struct {
 	ChainID     string
 	NodeRPCAddr string
 
-	KeyPath    string
 	KeyName    string
 	Passphrase string
 
 	ServiceInfo ServiceInfo
-	IritaClient servicesdk.IRITAClient
+	IritaClient *ServiceClient
 }
 
 // NewIritaHubChain constructs a new Irita-Hub chain
@@ -40,9 +40,10 @@ func NewIritaHubChain(
 	chainID string,
 	nodeRPCAddr string,
 	nodeGRPCAddr string,
-	keyPath string,
 	keyName string,
 	passphrase string,
+	keyArmor string,
+	txFee string,
 	serviceName string,
 	schemas string,
 	provider string,
@@ -60,10 +61,6 @@ func NewIritaHubChain(
 
 	if len(nodeGRPCAddr) == 0 {
 		nodeGRPCAddr = defaultNodeGRPCAddr
-	}
-
-	if len(keyPath) == 0 {
-		keyPath = defaultKeyPath
 	}
 
 	if len(serviceName) == 0 {
@@ -90,27 +87,29 @@ func NewIritaHubChain(
 		qos = defaultQoS
 	}
 
-	fee, err := types.ParseDecCoins(defaultFee)
+	if len(txFee) == 0 {
+		txFee = defaultFee
+	}
+
+	fee, err := types.ParseDecCoins(txFee)
 	if err != nil {
 		panic(err)
 	}
 
-	config := types.ClientConfig{
-		NodeURI:  nodeRPCAddr,
-		GRPCAddr: nodeGRPCAddr,
-		ChainID:  chainID,
-		Gas:      defaultGas,
-		Fee:      fee,
-		Mode:     defaultBroadcastMode,
-		Algo:     defaultKeyAlgorithm,
-		KeyDAO:   store.NewFileDAO(keyPath),
-		Level:    "debug",
-		Timeout:  timeout,
-	}
+	config, err := sdk.NewClientConfig(
+		nodeRPCAddr,
+		nodeGRPCAddr,
+		chainID,
+		sdk.FeeOption(fee),
+		sdk.GasOption(defaultGas),
+		sdk.ModeOption(defaultBroadcastMode),
+		sdk.AlgoOption(defaultKeyAlgorithm),
+		sdk.KeyDAOOption(storetypes.NewMemory(nil)),
+		sdk.TimeoutOption(5),
+	)
 	hub := IritaHubChain{
 		ChainID:     chainID,
 		NodeRPCAddr: nodeRPCAddr,
-		KeyPath:     keyPath,
 		KeyName:     keyName,
 		Passphrase:  passphrase,
 		ServiceInfo: ServiceInfo{
@@ -120,8 +119,15 @@ func NewIritaHubChain(
 			ServiceFee:  serviceFee,
 			QoS:         qos,
 		},
-		IritaClient: servicesdk.NewIRITAClient(config),
+		IritaClient: NewServiceClient(config),
 	}
+
+	// import key
+	addr, err := hub.ImportKey(keyName, passphrase, keyArmor)
+	if err != nil {
+		panic(err)
+	}
+	log.WithFields(log.Fields{"addr": addr}).Info("successfully import key in hub")
 
 	return hub
 }
@@ -132,9 +138,10 @@ func BuildIritaHubChain(config Config) IritaHubChain {
 		config.ChainID,
 		config.NodeRPCAddr,
 		config.NodeGRPCAddr,
-		config.KeyPath,
-		config.KeyName,
-		config.Passphrase,
+		config.Account.KeyName,
+		config.Account.Passphrase,
+		config.Account.KeyArmor,
+		config.Fee,
 		config.ServiceName,
 		config.Schemas,
 		config.Provider,
@@ -167,7 +174,7 @@ func (ic IritaHubChain) SendInterchainRequest(
 		//mysql.TxErrCollection(request.ID, err.Error())
 		return info, err
 	}
-	info.HubReqTxId = resTx.Hash
+	info.HubReqTxId = resTx.Hash.String()
 	logging.Logger.Infof("request context created on %s: %s", ic.ChainID, reqCtxID)
 
 	requests, err := ic.IritaClient.Service.QueryRequestsByReqCtx(reqCtxID, 1, nil)
@@ -247,11 +254,11 @@ func (ic IritaHubChain) ResponseListener(reqCtxID string, requestID string, cb c
 		return nil
 	}
 
-	callbackWrapper := func(reqCtxID, requestID, result string, response string) {
+	callbackWrapper := func(reqCtxID, requestID, response string) {
 		resp := core.ResponseAdaptor{
 			StatusCode: 200,
-			Result:     result,
-			Output:     response,
+			//Result:     result,
+			Output: response,
 		}
 
 		cb(requestID, resp)

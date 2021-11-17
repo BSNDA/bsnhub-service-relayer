@@ -1,20 +1,21 @@
 module relayer
 
-go 1.14
+go 1.16
 
 require (
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
-	github.com/bianjieai/irita-sdk-go v1.1.1-0.20210719021820-6734d59e4c56
+	github.com/bianjieai/iritamod-sdk-go v0.0.0-20211115021642-7519137c6c9f
 	github.com/cockroachdb/pebble v0.0.0-20201118202804-75ede898b66c
 	github.com/gin-gonic/gin v1.4.0
 	github.com/go-sql-driver/mysql v1.4.0
+	github.com/irisnet/core-sdk-go v0.0.0-20211104064902-e26c6107c96e
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.7.1
-	github.com/tendermint/tendermint v0.34.3
+	github.com/tendermint/tendermint v0.34.14
 )
 
 replace (
