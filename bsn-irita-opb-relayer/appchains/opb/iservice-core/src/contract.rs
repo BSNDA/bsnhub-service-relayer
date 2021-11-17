@@ -4,7 +4,7 @@ use json::object;
 use sha2::{Sha256, Digest};
 
 use cosmwasm_std::{
-    attr,to_binary,HumanAddr, Binary, Deps, DepsMut, Env, HandleResponse, InitResponse, MessageInfo, StdResult,CosmosMsg, WasmMsg
+    attr,to_binary,entry_point,Addr, Binary, Deps, DepsMut, Env, Response, MessageInfo, StdResult, WasmMsg, SubMsg
 };
 
 use crate::error::ContractError;
@@ -13,43 +13,45 @@ use crate::state::{CHAINID, RELAYER, REQUESTS, REQUESTSEQUENCE, CALLBACKS,Callba
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let mut relayer = msg.admin;
 
     if relayer.is_none(){
-        relayer = Some(info.sender);
+        relayer = Some(info.sender.clone());
     }
-
 
     let sequence: u64 = 0;
     REQUESTSEQUENCE.save(deps.storage, &sequence)?;
     CHAINID.save(deps.storage,&msg.source_chain_id)?;
     RELAYER.set(deps,relayer)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
-pub fn handle(
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError>  {
     match msg {
-        HandleMsg::SendRequest {endpoint_info, method, call_data, callback_address, callback_function} 
+
+        HandleMsg::SendRequest {endpoint_info, method, call_data, callback_address, callback_function}
         => send_request(deps,endpoint_info, method, call_data, callback_address, callback_function),
         HandleMsg::SetResponse { request_id,err_msg, output } => set_response(deps, request_id,err_msg, output),
         HandleMsg::SetRelayer{ relayer } => set_relayer(deps, relayer,info.sender),
     }
 }
 
-pub fn send_request(deps: DepsMut,endpoint_info: String, _method: String, call_data: Binary, callback_address: HumanAddr, call_back_function: String) -> Result<HandleResponse, ContractError> {
+pub fn send_request(deps: DepsMut,endpoint_info: String, _method: String, call_data: Binary, callback_address: Addr, call_back_function: String) -> Result<Response, ContractError> {
     let chain_id = CHAINID.load(deps.storage)?;
     let mut sequence = REQUESTSEQUENCE.load(deps.storage)?;
 
@@ -62,53 +64,49 @@ pub fn send_request(deps: DepsMut,endpoint_info: String, _method: String, call_d
 
     sequence += 1;
     REQUESTSEQUENCE.save(deps.storage, &sequence)?;
-    
+
     let call_back = Callback{
         address: callback_address,
         method: call_back_function,
     };
     CALLBACKS.save(deps.storage, &request_id, &call_back)?;
-
-    Ok(HandleResponse {
-        messages: vec![],
-        data: None,
-        attributes: vec![attr("request_id", request_id),attr("endpoint_info", endpoint_info),attr("method", _method),attr("callData", call_data)],
-    })
+    let mut res = Response::default();
+    res.attributes = vec![attr("request_id", request_id),attr("endpoint_info", endpoint_info),attr("method", _method),attr("callData", call_data.to_string())];
+    Ok(res)
 }
 
-pub fn set_response(deps: DepsMut,request_id: String, err_msg: String, output: String) -> Result<HandleResponse, ContractError> {
+pub fn set_response(deps: DepsMut,request_id: String, err_msg: String, output: String) -> Result<Response, ContractError>  {
     let executed = REQUESTS.load(deps.storage, &request_id);
     if executed.is_ok() {
         Err(ContractError::Unauthorized{})
-    }else{
+    } else {
         let mut result = err_msg;
         if output.len()>0 {
             result = output;
         }
 
-        REQUESTS.save(deps.storage, &request_id, &true)?;
+        REQUESTS.save(deps.storage, &request_id.clone(), &true)?;
 
-        let callback = CALLBACKS.load(deps.storage, &request_id)?;
-        let result_obg = object!{ callback.method.as_str() => object!{"request_id"=>request_id,"words"=>result}};
+        let callback = CALLBACKS.load(deps.storage, &request_id.clone())?;
+        let result_obg = object!{ callback.method.as_str() => object!{"request_id"=>request_id.clone(),"words"=>result}};
 
-        let msgs = vec![CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: callback.address,
+        let messages =vec![SubMsg::new(WasmMsg::Execute {
+            contract_addr: callback.address.to_string(),
             msg: Binary::from(result_obg.to_string().as_bytes()),
-            send: vec![],
+            funds: vec![],
         })];
-        
-        Ok(HandleResponse {
-            messages: msgs,
-            data: None,
-            attributes: vec![],
-        })
+
+        REQUESTS.save(deps.storage, &request_id.clone(), &true)?;
+        let mut res = Response::default();
+        res.messages = messages;
+        Ok(res)
     }
 }
 
-pub fn set_relayer(deps: DepsMut, relayer: Option<HumanAddr>, caller:HumanAddr) -> Result<HandleResponse, ContractError> {
+pub fn set_relayer(deps: DepsMut, relayer: Option<Addr>, caller:Addr) ->  Result<Response, ContractError>  {
     RELAYER.assert_admin(deps.as_ref(), &caller);
-    RELAYER.set(deps, relayer); 
-    Ok(HandleResponse::default())
+    RELAYER.set(deps, relayer);
+    Ok(Response::default())
 }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {

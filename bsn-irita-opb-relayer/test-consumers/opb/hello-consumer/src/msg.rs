@@ -1,12 +1,12 @@
-use cosmwasm_std::HumanAddr;
+use cosmwasm_std::Addr;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
-    pub core_contract: HumanAddr,
-    pub target_contract: HumanAddr,
+    pub core_contract: Addr,
+    pub target_contract: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
