@@ -14,10 +14,12 @@ func init() {
 		"wenchangchain",
 		"http://10.1.4.149:36657",
 		"10.1.4.149:39090",
+		"file",
+		".keys",
 		"node0",
 		"12345678",
 		"-----BEGIN TENDERMINT PRIVATE KEY-----\nkdf: bcrypt\nsalt: E82064503E284EE753B13E9424B08B4C\ntype: sm2\n\nqLgix+DPFfNY+TpWWlNmquy3jUDR314/dJmIxw8JCWGiSn4deFtp8IWGH/mnVe6S\nNdGt6OJ2SbwO098fk16Gw6RO+MgVjShVMXbkggc=\n=h7AT\n-----END TENDERMINT PRIVATE KEY-----",
-		"400uirita",
+		"4000000upoint",
 		"cc-contract-call",
 		`{"input":{"type":"object"},"output":{"type:"object"}}`,
 		"iaa13fnhnwmjmkdf9wdy3f3ee0umfve8hyarwaerqm",
@@ -30,7 +32,7 @@ func init() {
 func TestExecuteAppContract(t *testing.T) {
 	resultTx, err := svcClient.IritaClient.WASM.Execute(
 		"iaa1ghd753shjuwexxywmgs4xz7x2q732vcnednxe6",
-		wasm.NewContractABI().WithMethod("hello").WithArgs("words", "it's a test string"),
+		wasm.NewContractABI().WithMethod("hello").WithArgs("words", "test111"),
 		sdk.NewCoins(sdk.NewCoin("uirita", sdk.NewInt(1000000))),
 		sdk.BaseTx{
 			From:     "node0",

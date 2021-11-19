@@ -4,11 +4,12 @@ go 1.16
 
 require (
 	github.com/OneOfOne/xxhash v1.2.5 // indirect
-	github.com/bianjieai/iritamod-sdk-go v0.0.0-20211115021642-7519137c6c9f
+	github.com/bianjieai/iritamod-sdk-go v0.0.0-20211119065750-d3edd49ebbe1
 	github.com/cockroachdb/pebble v0.0.0-20201118202804-75ede898b66c
+	github.com/dvsekhvalnov/jose2go v1.5.0 // indirect
 	github.com/gin-gonic/gin v1.4.0
 	github.com/go-sql-driver/mysql v1.4.0
-	github.com/irisnet/core-sdk-go v0.0.0-20211104064902-e26c6107c96e
+	github.com/irisnet/core-sdk-go v0.0.0-20211118114422-2efa1178f1e2
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/afero v1.2.2 // indirect

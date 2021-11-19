@@ -40,6 +40,8 @@ func NewIritaHubChain(
 	chainID string,
 	nodeRPCAddr string,
 	nodeGRPCAddr string,
+	keyMode string,
+	keyPath string,
 	keyName string,
 	passphrase string,
 	keyArmor string,
@@ -95,6 +97,12 @@ func NewIritaHubChain(
 	if err != nil {
 		panic(err)
 	}
+	var keyDAO storetypes.KeyDAO
+	if keyMode == "mem" {
+		keyDAO = storetypes.NewMemory(nil)
+	} else {
+		keyDAO = storetypes.NewFileDAO(keyPath)
+	}
 
 	config, err := sdk.NewClientConfig(
 		nodeRPCAddr,
@@ -104,7 +112,7 @@ func NewIritaHubChain(
 		sdk.GasOption(defaultGas),
 		sdk.ModeOption(defaultBroadcastMode),
 		sdk.AlgoOption(defaultKeyAlgorithm),
-		sdk.KeyDAOOption(storetypes.NewMemory(nil)),
+		sdk.KeyDAOOption(keyDAO),
 		sdk.TimeoutOption(5),
 	)
 	hub := IritaHubChain{
@@ -123,12 +131,14 @@ func NewIritaHubChain(
 	}
 
 	// import key
-	addr, err := hub.ImportKey(keyName, passphrase, keyArmor)
-	if err != nil {
-		panic(err)
+	if keyMode == "mem" {
+		log.WithField("keyName", keyName).Info("use memory key dao, importing key...")
+		addr, err := hub.ImportKey(keyName, passphrase, keyArmor)
+		if err != nil {
+			panic(err)
+		}
+		log.WithFields(log.Fields{"addr": addr}).Info("successfully import key in hub")
 	}
-	log.WithFields(log.Fields{"addr": addr}).Info("successfully import key in hub")
-
 	return hub
 }
 
@@ -138,9 +148,11 @@ func BuildIritaHubChain(config Config) IritaHubChain {
 		config.ChainID,
 		config.NodeRPCAddr,
 		config.NodeGRPCAddr,
-		config.Account.KeyName,
-		config.Account.Passphrase,
-		config.Account.KeyArmor,
+		config.KeyMode,
+		config.KeyPath,
+		config.KeyName,
+		config.Passphrase,
+		config.KeyArmor,
 		config.Fee,
 		config.ServiceName,
 		config.Schemas,
