@@ -2,7 +2,6 @@ package opb
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/spf13/viper"
 	"math/rand"
 
@@ -14,9 +13,13 @@ const (
 
 	// base config
 	ChainId         = "chain_id"
-	AccountKey      = "account"
 	RpcAddrsMap     = "rpc_addrs"
 	GrpcAddrsMap    = "grpc_addrs"
+	KeyMode         = "key_mode"
+	KeyPath         = "key_path"
+	KeyName         = "key_name"
+	Passphrase      = "passphrase"
+	KeyArmor        = "key_armor"
 	MonitorInterval = "monitor_interval"
 	DefaultFee      = "default_fee"
 	DefaultGas      = "default_gas"
@@ -29,20 +32,18 @@ const (
 
 // BaseConfig defines the base config
 type BaseConfig struct {
-	Account         Account `yaml:"account"`
 	RpcAddrsMap     map[string]string
 	GrpcAddrsMap    map[string]string
+	KeyMode         string `yaml:"key_mode"`
+	KeyPath         string `yaml:"key_path"`
+	KeyName         string `yaml:"key_name"`
+	Passphrase      string `yaml:"passphrase"`
+	KeyArmor        string `yaml:"key_armor" mapstructure:"key_armor"`
 	ChainId         string
 	DefaultFee      string
 	Timeout         uint
 	DefaultGas      uint64
 	MonitorInterval uint64
-}
-
-type Account struct {
-	KeyName    string `yaml:"key_name" mapstructure:"key_name"`
-	Passphrase string `yaml:"passphrase"`
-	KeyArmor   string `yaml:"key_armor" mapstructure:"key_armor"`
 }
 
 func (bc *BaseConfig) PrintConfig() {
@@ -56,11 +57,6 @@ type Config struct {
 
 // NewBaseConfig constructs a new BaseConfig instance from viper
 func NewBaseConfig(v *viper.Viper) (*BaseConfig, error) {
-	account := Account{}
-	err := v.UnmarshalKey(cfg.GetConfigKey(Prefix, AccountKey), &account)
-	if err != nil {
-		fmt.Println(err)
-	}
 	config := new(BaseConfig)
 	config.ChainId = v.GetString(cfg.GetConfigKey(Prefix, ChainId))
 	config.RpcAddrsMap = v.GetStringMapString(cfg.GetConfigKey(Prefix, RpcAddrsMap))
@@ -69,8 +65,11 @@ func NewBaseConfig(v *viper.Viper) (*BaseConfig, error) {
 	config.DefaultFee = v.GetString(cfg.GetConfigKey(Prefix, DefaultFee))
 	config.DefaultGas = v.GetUint64(cfg.GetConfigKey(Prefix, DefaultGas))
 	config.MonitorInterval = v.GetUint64(cfg.GetConfigKey(Prefix, MonitorInterval))
-	config.Account = account
-
+	config.KeyMode = v.GetString(cfg.GetConfigKey(Prefix, KeyMode))
+	config.KeyPath = v.GetString(cfg.GetConfigKey(Prefix, KeyPath))
+	config.KeyName = v.GetString(cfg.GetConfigKey(Prefix, KeyName))
+	config.Passphrase = v.GetString(cfg.GetConfigKey(Prefix, Passphrase))
+	config.KeyArmor = v.GetString(cfg.GetConfigKey(Prefix, KeyArmor))
 	return config, nil
 }
 func randURL(m []string) string {

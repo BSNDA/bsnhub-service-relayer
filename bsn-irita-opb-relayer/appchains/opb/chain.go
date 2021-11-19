@@ -57,9 +57,16 @@ func NewOpbChain(
 	}
 	fees, _ := sdktypes.ParseDecCoins(config.DefaultFee)
 
+	var keyDAO sdkstore.KeyDAO
+	if config.KeyMode == "mem" {
+		keyDAO = sdkstore.NewMemory(nil)
+	} else {
+		keyDAO = sdkstore.NewFileDAO(config.KeyPath)
+	}
+
 	options := []sdktypes.Option{
 		sdktypes.CachedOption(true),
-		sdktypes.KeyDAOOption(sdkstore.NewMemory(nil)),
+		sdktypes.KeyDAOOption(keyDAO),
 		sdktypes.FeeOption(fees),
 		sdktypes.GasOption(config.DefaultGas),
 		sdktypes.TimeoutOption(config.Timeout),
@@ -87,12 +94,13 @@ func NewOpbChain(
 	}
 
 	// import opb key
-	addr, err := opb.OpbClient.Import(config.Account.KeyName, config.Account.Passphrase, config.Account.KeyArmor)
-	if err != nil {
-		return nil, err
+	if config.KeyMode == "mem" {
+		addr, err := opb.OpbClient.Import(config.KeyName, config.Passphrase, config.KeyArmor)
+		if err != nil {
+			return nil, err
+		}
+		log.WithFields(log.Fields{"addr": addr}).Info("import opb account success")
 	}
-	log.WithFields(log.Fields{"addr": addr}).Info("import opb account success")
-
 	err = opb.storeChainParams()
 	if err != nil {
 		return nil, err
@@ -237,8 +245,8 @@ func (opb *OpbChain) waitForSuccess(txHash string, name string) error {
 // BuildBaseTx builds a base tx
 func (opb *OpbChain) BuildBaseTx() types.BaseTx {
 	return types.BaseTx{
-		From:     opb.Config.Account.KeyName,
-		Password: opb.Config.Account.Passphrase,
+		From:     opb.Config.KeyName,
+		Password: opb.Config.Passphrase,
 		Mode:     sdktypes.Commit,
 	}
 }
